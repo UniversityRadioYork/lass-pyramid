@@ -1,7 +1,7 @@
 from pyramid.config import Configurator
 from sqlalchemy import engine_from_config
 
-from .models import (
+from .model_base import (
     DBSession,
     Base,
 )
@@ -15,5 +15,5 @@ def main(global_config, **settings):
     Base.metadata.bind = engine
     config = Configurator(settings=settings)
     config.include('pyramid_zcml')
-    config.load_zcml('configure.zcml')
+    config.load_zcml('config.global:configure.zcml')
     return config.make_wsgi_app()

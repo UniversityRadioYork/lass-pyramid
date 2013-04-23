@@ -1,12 +1,10 @@
 import pyramid
 import yaml
 
-#from .models import (
-#    DBSession,
-#    Person
-#)
+import lass.model_base
+import lass.schedule.models
 
-STATIC = 'lass_assets:static'
+STATIC = 'assets:static'
 
 
 def process_pages(request, pages):
@@ -61,8 +59,7 @@ def standard_context(request, **context):
     return dict(
         {
             'shows_on_air': [
-                {'name': 'URY Jokebox', 'can_be_messaged': True},
-                {'name': 'Wakefield Hour', 'can_be_messaged': True}
+                lass.model_base.DBSession.query(lass.schedule.models.Show).get(1)
             ],
             'transmitting': True,
             'website': website,
