@@ -1,7 +1,7 @@
 import sqlalchemy
 
 from .. import Base
-import lass.metadata.mixins
+import lass.metadata
 import lass.people.mixins
 
 
@@ -34,6 +34,7 @@ class Show(
         sqlalchemy.DateTime(timezone=True)
     )
 
-    @property
-    def date(self):
-        return self.submitted_at
+    @classmethod
+    def meta_sources(cls, meta_type):
+        """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
+        return [lass.metadata.query.own(with_default=True)]

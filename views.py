@@ -7,6 +7,18 @@ import lass.schedule.models
 STATIC = 'assets:static'
 
 
+class MockSchedule(object):
+    @property
+    def timeslots(self):
+        if not hasattr(self, '_timeslots'):
+            self._timeslots = [
+                lass.model_base.DBSession.query(
+                    lass.schedule.models.Show
+                ).get(1)
+            ]
+        return self._timeslots
+
+
 def process_pages(request, pages):
     new_pages = {}
     for name, page in pages.items():
@@ -52,25 +64,28 @@ def get_page_title(request, current_url, website):
     return page_title
 
 
-def standard_context(request, **context):
+@pyramid.events.subscriber(pyramid.events.BeforeRender)
+def standard_context(event):
+    request = event['request']
+
     website = make_website(request)
     static = lambda *args: request.static_url('/'.join((STATIC,) + args))
-    current_url = pyramid.url.current_route_url(request)
-    return dict(
+    try:
+        current_url = pyramid.url.current_route_url(request)
+    except ValueError:
+        current_url = None
+
+    event.update(
         {
-            'shows_on_air': [
-                lass.model_base.DBSession.query(lass.schedule.models.Show).get(1)
-            ],
+            'current_schedule': MockSchedule(),
             'transmitting': True,
             'website': website,
             'static': static,
             'url': request.route_url,
             'raw_url': lambda r: request.route_url('home') + r,
             'current_url': current_url,
-            'request': request,
             'page_title': get_page_title(request, current_url, website),
-        },
-        **context
+        }
     )
 
 
@@ -85,7 +100,7 @@ def standard_context(request, **context):
 def static(request):
     """A view that can be used for static website pages.
     """
-    return standard_context(request)
+    return dict()
 
 
 @pyramid.view.view_config(
@@ -93,10 +108,9 @@ def static(request):
     renderer='website/listen.jinja2'
 )
 def listen(request):
-    return standard_context(
-        request,
-        streams=STREAMS
-    )
+    return {
+        'streams': STREAMS
+    }
 
 
 @pyramid.view.view_config(
@@ -104,4 +118,16 @@ def listen(request):
     renderer='website/index.jinja2'
 )
 def home(request):
-    return standard_context(request, page_title='Home')
+    return {
+        'page_title': 'Home'
+    }
+
+
+@pyramid.view.notfound_view_config(
+    renderer='errors/404.jinja2',
+    append_slash=True
+)
+def not_found(context, request):
+    return {
+        'page_title': 'Not Found'
+    }

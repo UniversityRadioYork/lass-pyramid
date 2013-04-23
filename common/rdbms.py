@@ -84,6 +84,7 @@ def primary_key_of(table):
     """
     # Need to have one and only one primary key on the subject for this to work
     # (o/` I am the one and only o/`)
+
     pkeys = table.primary_key.columns.values()
     if len(pkeys) != 1:
         raise ValueError('Subject must have exactly one primary key.')
@@ -178,12 +179,12 @@ def nameables_equal(table, key):
     return result
 
 
-def inferred_table(sub_table, namer, creator):
+def inferred_table(subject_table, namer, creator):
     """Creates or gets a table whose name and other properties are 'inferred'
     from another table.
 
     Args:
-        sub_table: The table of the subject of the inference.
+        subject_table: The table of the subject of the inference.
         namer: A callable taking the subject table's name (as keyword argument
             'subject_table_name', IMPORTANT) and returning the inferred table's
             name.
@@ -192,14 +193,14 @@ def inferred_table(sub_table, namer, creator):
             Table
     Returns:
         A Table as created by 'creator' and named by 'namer' with respect to
-        'sub_table'.
+        'subject_table'.
     """
-    table_name = namer(subject_table_name=sub_table.name)
+    table_name = namer(subject_table_name=subject_table.name)
 
     return create_or_get_table(
-        sub_table.metadata.tables,
-        to_full_name(sub_table.schema, table_name),
-        lambda: creator(sub_table=sub_table, table_name=table_name)
+        subject_table.metadata.tables,
+        to_full_name(subject_table.schema, table_name),
+        lambda: creator(subject_table=subject_table, table_name=table_name)
     )
 
 
@@ -273,16 +274,4 @@ def indirect_join(left, right, through):
     'left' and 'through', and 'through' and 'right', must have matched pairs of
     primary and foreign keys (the foreign keys being on 'through') to work.
     """
-    left_pk = primary_key_of(left)
-    left_fk = find_foreign_key_to(left_pk, through, left)
-
-    right_pk = primary_key_of(right)
-    right_fk = find_foreign_key_to(right_pk, through, right)
-
-    return left.join(
-        through,
-        left_pk == left_fk
-    ).join(
-        right,
-        right_pk == right_fk
-    )
+    return left.join(through).join(right)

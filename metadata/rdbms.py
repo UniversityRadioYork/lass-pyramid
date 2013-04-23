@@ -11,9 +11,13 @@ from . import models
 
 
 # Mapping of meta_types to their value column types.
+# NOTE: These are lambda-delayed so that the same column isn't referenced by
+# multiple metadata tables (a new column is made every time).  This would cause
+# issues!
+mkcolumn = functools.partial(sqlalchemy.Column, 'metadata_value')
 RDBMS_COLUMNS = {
-    'text': sqlalchemy.Column('metadata_value', sqlalchemy.Text()),
-    'image': sqlalchemy.Column('metadata_value', sqlalchemy.String(255))
+    'text': lambda: mkcolumn(sqlalchemy.Text()),
+    'image': lambda: mkcolumn(sqlalchemy.String(255))
 }
 
 
@@ -29,9 +33,22 @@ def metadata_from_sources(sources, date, *keys, limit=None, describe=False):
 
 def to_dict(results):
     """Converts a metadata query results set into a dict-like object."""
-    results_dict = collections.defaultdict(list)
-    for key, value in results:
-        results_dict[key].append(value)
+    # Nested defaultdicts, oh my!  This is because these dicts are
+    # mappings from subjects to dicts of keys to value lists, and both levels
+    # have return-empty default behaviour
+    results_dict = collections.defaultdict(
+        lambda: collections.defaultdict(list)
+    )
+
+    # Kick out duplicate values whilst preserving order and listiness.
+    # Based somewhat on http://stackoverflow.com/questions/480214
+    seen_dict = collections.defaultdict(
+        lambda: collections.defaultdict(set)
+    )
+    for subject, key, value in results:
+        if value not in seen_dict[key]:
+            results_dict[subject][key].append(value)
+            seen_dict[subject][key].add(value)
     return results_dict
 
 
@@ -40,6 +57,7 @@ def metadata_from_table(table, date, keys):
     key_table = models.Key.__table__
     return sqlalchemy.select(
         [
+            table.c.subject_id,
             key_table.c.name.label('key'),
             table.c.value
         ],
@@ -55,18 +73,17 @@ def metadata_from_table(table, date, keys):
     )
 
 
-def direct_table(sub_table, sub_key, meta_type, priority):
+def direct_table(subject_table, subject_keys, meta_type, priority):
     """Creates a metadata query against a single database table.
 
     See 'make_metadata_table' for information about what is required of the
     query subject for this to work.
 
     Args:
-        sub_table: The of the metadata subject, which is used to infer
+        subject_table: The of the metadata subject, which is used to infer
             where the metadata is.
-        sub_key: The primary key of the metadata subject, which may be
-            different from the subject's actual key (for example, when looking
-            for default metadata)
+        subject_keys: The primary key of the metadata subjects (None is allowed
+            if the subject supports default metadata).
         meta_type: The metadata type name.
         priority: The priority flag to attach to each record returned.
             This is used to rank metadata rows in ASCENDING order (lower
@@ -74,41 +91,49 @@ def direct_table(sub_table, sub_key, meta_type, priority):
     Returns:
         A SQLAlchemy SELECT query against the appropriate metadata table.
     """
-    table = metadata_table(sub_table, meta_type)
-    return sqlalchemy.sql.select(
-        [
-            table.c.metadata_value.label('value'),
-            table.c.effective_from,
-            table.c.effective_to,
-            table.c.metadata_key_id,
-            sqlalchemy.literal(priority).label('priority')
-        ]
-    ).where(
-        subject_of(table, sub_table) == sub_key
+    table = metadata_table(subject_table, meta_type)
+    subject_column = subject_of(table, subject_table)
+    key_limit = (
+        lambda select: select.where(
+            subject_of(table, subject_table).in_(subject_keys)
+        ) if subject_keys else select
+    )
+    return key_limit(
+        sqlalchemy.sql.select(
+            [
+                table.c.metadata_value.label('value'),
+                table.c.effective_from,
+                table.c.effective_to,
+                table.c.metadata_key_id,
+                subject_column.label('subject_id'),
+                sqlalchemy.literal(priority).label('priority')
+            ]
+        )
     )
 
 
-def package(sub_table, sub_key, meta_type, priority):
+def package(subject_table, subject_keys, meta_type, priority):
     # Intent: retrieve all metadata for packages, then filter down to metadata
     # joined to the subject via a package entry.
-    package_meta = direct_table(
-        models.package.Package.__table__,
-        sub_key,
+    package_entries = package_entry_table(subject_table, meta_type)
+    return direct_table(
+        models.Package.__table__,
+        None,
         meta_type,
         priority
+    ).select_from(
+        sqlalchemy.join(
+            models.Package.__table__,
+            package_entries
+        ).join(
+            subject_table
+        )
     )
-    package_entries = package_entry_table(sub_table, meta_type)
-
-    return lass.common.rdbms.indirect_join(
-        package_meta,
-        package_entries,
-        sub_table
-    )
 
 
-def package_entry_table(sub_table, meta_type):
+def package_entry_table(subject_table, meta_type):
     return lass.common.rdbms.inferred_table(
-        sub_table,
+        subject_table,
         namer=functools.partial(
             lass.common.rdbms.make_table_name, 'package_entry'
         ),
@@ -128,7 +153,7 @@ def subject_of(metadata_table, subject_table):
     )
 
 
-def metadata_table(sub_table, meta_type):
+def metadata_table(subject_table, meta_type):
     """Returns a SQLAlchemy table definition for storing the given meta_type of
     metadata in an RDBMS for the given subject class.
 
@@ -143,7 +168,7 @@ def metadata_table(sub_table, meta_type):
         A sqlalchemy.Table that represents the metadata table.
     """
     return lass.common.rdbms.inferred_table(
-        sub_table,
+        subject_table,
         namer=functools.partial(
             lass.common.rdbms.make_table_name, meta_type, 'metadata'
         ),
@@ -151,7 +176,7 @@ def metadata_table(sub_table, meta_type):
     )
 
 
-def make_package_entry_table(sub_table, table_name):
+def make_package_entry_table(subject_table, table_name):
     """Creates a SQLAlchemy table definition for storing package entries
     in an RDBMS for the given subject table.
 
@@ -160,18 +185,18 @@ def make_package_entry_table(sub_table, table_name):
     """
     return lass.common.rdbms.make_attached_table(
         table_name,
-        sub_table,
-        models.package.package_foreign_key(),
-        lass.common.mixins.effective_from_column,
-        lass.common.mixins.effective_to_column,
-        lass.people.models.person_foreign_key('memberid', nullable=False),
-        lass.people.models.person_foreign_key('approved', nullable=False),
+        subject_table,
+        models.package_foreign_key(),
+        lass.common.mixins.effective_from_column(),
+        lass.common.mixins.effective_to_column(),
+        lass.people.mixins.approver_column(),
+        lass.people.mixins.submitter_column(),
         primary_key_nullable=False,
         foreign_key_nullable=True  # May need changing in some legacy tables
     )
 
 
-def make_metadata_table(sub_table, meta_type, table_name):
+def make_metadata_table(subject_table, meta_type, table_name):
     """Creates a SQLAlchemy table definition for storing the given meta_type of
     metadata in an RDBMS for the given subject table.
 
@@ -180,16 +205,16 @@ def make_metadata_table(sub_table, meta_type, table_name):
     """
     return lass.common.rdbms.make_attached_table(
         table_name,
-        sub_table,
+        subject_table,
         sqlalchemy.Column(
             'metadata_key_id',
             sqlalchemy.Integer,
             sqlalchemy.ForeignKey('metadata.metadata_key.metadata_key_id'),
         ),
-        RDBMS_COLUMNS[meta_type],
+        RDBMS_COLUMNS[meta_type](),
         # TODO: migrate to mixins
-        lass.common.mixins.effective_from_column,
-        lass.common.mixins.effective_to_column,
+        lass.common.mixins.effective_from_column(),
+        lass.common.mixins.effective_to_column(),
         lass.people.models.person_foreign_key(name='memberid', nullable=False),
         lass.people.models.person_foreign_key(name='approved', nullable=False),
         primary_key_nullable=False,

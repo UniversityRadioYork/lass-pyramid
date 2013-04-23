@@ -3,6 +3,8 @@ accessed in a common manner is described.
 
 """
 
+import collections
+import datetime
 import functools
 
 from . import query
@@ -11,7 +13,8 @@ from . import query
 class MetadataSubject(object):
     """Mixin granting the ability to access metadata."""
 
-    def meta_sources(self, meta_type):
+    @classmethod
+    def meta_sources(cls, meta_type):
         """
         Given a metadata type, returns an iterable of sources for that type.
 
@@ -24,29 +27,81 @@ class MetadataSubject(object):
         See 'metadata.query' for helper functions to construct sources.
         """
         return [
-            query.own(self),
-            query.default(self),
-            query.package(self),
-            query.default_package(self),
+            query.own(with_default=True),
+            query.package(with_default=True)
             # To add metadata inheritance, you would either add direct source
             # calls pointing to the parent object, OR append in a call to the
             # parent's 'meta_sources' using + or append.
         ]
 
-    def meta(self, meta_type, *keys, date=None, sources=None, describe=False):
-        """Returns the value(s) of the metadata under the given type and keys
-        on the given date (or, if 'date' is None, the result of
-        'self.meta_date').
+    @classmethod
+    def bulk_meta(
+        cls,
+        subjects,
+        meta_type,
+        *keys,
+        date=None,
+        sources=None,
+        describe=False
+    ):
+        """Performs a metadata query on multiple objects of this class.
 
-        This function will try to use caching, first in the form of
-        in-object cache and secondly by using any external cache set up.
+        Metadata is cached for the lifetime of this object.
 
         'sources', if undefined or falsy, will default to the value of
-        'self.meta_sources'.
+        'cls.meta_sources'.
 
-        'date', if undefined or falsy, will default to the value of
-        'self.date'.
+        'date', if undefined or falsy, will default to the current time.
         """
+        hits = collections.defaultdict(dict)
+        misses = set()
+        hashes = dict()
+        for subject in subjects:
+            hashes[subject], subject_hits, subject_misses = (
+                subject.meta_cache_check(
+                    meta_type,
+                    date,
+                    keys
+                )
+            )
+            hits[subject.id].update(subject_hits)
+            misses |= subject_misses
+        if misses:
+            results = query.run(
+                subjects,
+                meta_type,
+                date if date else datetime.datetime.now(datetime.timezone.utc),
+                sources if sources else cls.meta_sources(meta_type),
+                *misses,
+                describe=describe
+            )
+            for subject in subjects:
+                hits[subject.id].update(results[subject.id])
+                subject.meta_cache_update(hashes[subject], results[subject.id])
+
+        return hits
+
+    def meta_cache_update(self, hashes, results):
+        self._meta_cache.update(
+            {
+                hashes[key]: value
+                for key, value in results.items()
+            }
+        )
+
+    def meta(self, *args, **keywords):
+        """Performs a metadata query on this object only.
+
+        See 'bulk_meta', for which this is a wrapper, for information on the
+        arguments that may be passed to this.
+
+        Example usage:
+        show.meta('text', 'title') -> {'title': 'Slow Down Zone'}
+
+        """
+        return self.__class__.bulk_meta([self], *args, **keywords)[self.id]
+
+    def meta_cache_check(self, meta_type, date, keys):
         if not hasattr(self, '_meta_cache'):
             self._meta_cache = dict()
 
@@ -58,20 +113,11 @@ class MetadataSubject(object):
         )
         hashes = {key: hasher(key=key) for key in keys}
         # Fetch in bulk any keys not already stored in the object cache.
-        misses = [key for key in keys if hashes[key] not in self._meta_cache]
-        if misses:
-            results = query.run(
-                self,
-                meta_type,
-                date if date else self.date,
-                sources if sources else self.meta_sources(meta_type),
-                *keys,
-                describe=describe
-            )
-            self._meta_cache.update(
-                {
-                    hashes[key]: value
-                    for key, value in results.items()
-                }
-            )
-        return {key: self._meta_cache[hashes[key]] for key in keys}
+        hits, misses = dict(), set()
+        for key in keys:
+            h = hashes[key]
+            if h in self._meta_cache:
+                hits[key] = self._meta_cache[h]
+            else:
+                misses.add(key)
+        return hashes, hits, misses
