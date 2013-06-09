@@ -2,6 +2,7 @@ import pyramid
 import yaml
 
 import lass.model_base
+import lass.schedule.lists
 import lass.schedule.models
 
 STATIC = 'assets:static'
@@ -11,11 +12,8 @@ class MockSchedule(object):
     @property
     def timeslots(self):
         if not hasattr(self, '_timeslots'):
-            self._timeslots = [
-                lass.model_base.DBSession.query(
-                    lass.schedule.models.Show
-                ).get(1)
-            ]
+            self._timeslots = lass.schedule.lists.next(10)
+            lass.schedule.models.Timeslot.annotate(self._timeslots)
         return self._timeslots
 
 
@@ -38,7 +36,7 @@ def make_website(request):
     website = {}
 
     a = pyramid.path.AssetResolver()
-    with open(a.resolve('lass:website.yml').abspath()) as website_file:
+    with open(a.resolve('config:sitewide/website.yml').abspath()) as website_file:
         website.update(yaml.load(website_file))
 
     if 'pages' in website:

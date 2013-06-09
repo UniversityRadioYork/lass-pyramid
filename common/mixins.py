@@ -7,7 +7,6 @@ import sqlalchemy
 # Note that these MUST be lambda'd to prevent the same column being used in
 # multiple models/tables.
 description_column = lambda: sqlalchemy.Column(
-    """Mixin for models with a description."""
     'description',
     sqlalchemy.Text(),
     nullable=False
@@ -39,7 +38,8 @@ class Described(object):
     """Mixin for models whose items have a description.
 
     This is intended mainly for describing things like categories and types;
-    generally you will want to use metadata for most describable items.
+    generally you will want to use metadata for most describable items as
+    Described does not implement history.
     """
     description = description_column()
 

@@ -6,8 +6,12 @@ from .model_base import (
     Base,
 )
 
+from . import (
+    common
+)
 
-def main(global_config, **settings):
+
+def main(_, **settings):
     """ This function returns a Pyramid WSGI application.
     """
     engine = engine_from_config(settings, 'sqlalchemy.')

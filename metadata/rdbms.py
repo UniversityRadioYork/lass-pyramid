@@ -1,6 +1,5 @@
 """Functions for working with relational database storage of metadata."""
 
-import collections
 import functools
 
 import sqlalchemy
@@ -28,28 +27,10 @@ def metadata_from_sources(sources, date, *keys, limit=None, describe=False):
     limiter = lambda x: (x.limit(limit) if limit else x)
     executor = print if describe else lass.common.rdbms.execute
 
-    return to_dict(executor(limiter(metadata_from_table(union, date, keys))))
-
-
-def to_dict(results):
-    """Converts a metadata query results set into a dict-like object."""
-    # Nested defaultdicts, oh my!  This is because these dicts are
-    # mappings from subjects to dicts of keys to value lists, and both levels
-    # have return-empty default behaviour
-    results_dict = collections.defaultdict(
-        lambda: collections.defaultdict(list)
+    return lass.common.rdbms.bulk_group(
+        executor(limiter(metadata_from_table(union, date, keys))),
+        levels=2
     )
-
-    # Kick out duplicate values whilst preserving order and listiness.
-    # Based somewhat on http://stackoverflow.com/questions/480214
-    seen_dict = collections.defaultdict(
-        lambda: collections.defaultdict(set)
-    )
-    for subject, key, value in results:
-        if value not in seen_dict[key]:
-            results_dict[subject][key].append(value)
-            seen_dict[subject][key].add(value)
-    return results_dict
 
 
 def metadata_from_table(table, date, keys):
@@ -67,6 +48,7 @@ def metadata_from_table(table, date, keys):
         (key_table.c.name.in_(keys))
         & lass.common.rdbms.transient_active_on(date, table)
     ).order_by(
+        sqlalchemy.asc(table.c.subject_id),
         sqlalchemy.asc(key_table.c.name),
         sqlalchemy.asc(table.c.priority),
         sqlalchemy.desc(table.c.effective_from)
@@ -190,7 +172,7 @@ def make_package_entry_table(subject_table, table_name):
         lass.common.mixins.effective_from_column(),
         lass.common.mixins.effective_to_column(),
         lass.people.mixins.approver_column(),
-        lass.people.mixins.submitter_column(),
+        lass.people.mixins.owner_column(),
         primary_key_nullable=False,
         foreign_key_nullable=True  # May need changing in some legacy tables
     )

@@ -9,6 +9,9 @@ Unless stated otherwise, these functions use URY database conventions:
     5) ...as are unambiguous foreign keys to other tables.
 """
 
+import collections
+import itertools
+
 import sqlalchemy
 
 import lass.model_base
@@ -19,6 +22,53 @@ NAMEABLES_EQUAL_GETTERS = {
     int: lambda table, key: primary_key_of(table) == key,
     object: lambda table, key: primary_key_of(table) == key.id,
 }
+
+
+def in_if_defined(column, xs):
+    """Returns 'column in xs' if xs is truthy, else True."""
+    return column.in_(xs) if xs else True
+
+
+def bulk_group(tuples, levels=2):
+    """Given an iterable of tuples, recursively groups the tuples into
+    dicts until the final item of each tuple is thusly grouped.
+
+    The result is a dictionary of either nested dictionaries or lists, depending
+    on when 'levels' nesting levels is reached; the lists will contain only
+    one of each element, but in the order that the tuples existed in the
+    original list.
+    
+    This is most useful for assembling database results into hierarchies, for
+    example grouping metadata by subject/key or credits by subject/type.
+
+    NOTE: The grouping elements MUST be ordered.
+    """
+    assert(levels > 0)
+
+    result = collections.defaultdict(dict if levels > 1 else list)
+    grouped = itertools.groupby(tuples, lambda x: x[0])
+
+    for group, raw_groupees in grouped:
+        # The groupees still have the group as index 0 in their tuple,
+        # let's remove it and flatten the tuple if possible
+        groupees = (
+            (groupee[1] if len(groupee) == 2 else groupee[1:])
+            for groupee in raw_groupees
+        )
+        if levels > 1:
+            result[group] = bulk_group(groupees, levels=levels - 1)
+        else:
+            result[group] = remove_duplicates(groupees)
+    return result
+    
+
+def remove_duplicates(xs):
+    # Inefficient but works on non-hashables (including lists).
+    unique = []
+    for x in xs:
+        if x not in unique:
+            unique.append(x)
+    return unique
 
 
 def execute(*args, **kwargs):

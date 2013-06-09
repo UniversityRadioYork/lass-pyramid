@@ -9,12 +9,39 @@ import functools
 
 from . import query
 
+import lass.common.utils
+
 
 class MetadataSubject(object):
     """Mixin granting the ability to access metadata."""
 
     @classmethod
-    def meta_sources(cls, meta_type):
+    def add_meta(cls, items, meta_type, *keys, date=None, attr=None):
+        """Annotates a set of items with their metadata.
+
+        This is a bulk metadata query operation (one metadata query per call).
+
+        Args:
+            items: The items to annotate.  These MUST be instances of 'cls'. 
+            meta_type: The metadata type to fetch from, for example 'text' or
+                'image'.
+            *keys: The metadata key names to fetch metadata for.  If no keys are
+                provided, all metadata keys are returned.
+            date: The date (as a datetime) on which the retrieved metadata should be
+                active. (Default: see 'bulk_meta')
+            attr: The name of the attribute on the items in which the metadata
+                dictionary will be stored.  (Default: the value of meta_type)
+        """
+        if items:
+            lass.common.utils.annotate(
+                items,
+                cls.bulk_meta(items, meta_type, *keys, date=date),
+                attribute_name=attr if attr else meta_type
+            )
+
+
+    @classmethod
+    def meta_sources(cls):
         """
         Given a metadata type, returns an iterable of sources for that type.
 
@@ -71,13 +98,14 @@ class MetadataSubject(object):
                 subjects,
                 meta_type,
                 date if date else datetime.datetime.now(datetime.timezone.utc),
-                sources if sources else cls.meta_sources(meta_type),
+                sources if sources else cls.meta_sources(),
                 *misses,
                 describe=describe
             )
             for subject in subjects:
-                hits[subject.id].update(results[subject.id])
-                subject.meta_cache_update(hashes[subject], results[subject.id])
+                if subject.id in results:
+                    hits[subject.id].update(results[subject.id])
+                    subject.meta_cache_update(hashes[subject], results[subject.id])
 
         return hits
 

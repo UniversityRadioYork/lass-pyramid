@@ -18,6 +18,25 @@ def person_foreign_key(*args, **keywords):
     )
 
 
+class CreditType(lass.Base, lass.common.mixins.Type):
+    """A type of credit."""
+    __tablename__ = 'credit_type'
+    __table_args__ = {'schema': 'people'}
+
+    id = sqlalchemy.Column(
+        'credit_type_id',
+        sqlalchemy.Integer(),
+        primary_key=True,
+        nullable=False
+    )
+    plural = sqlalchemy.Column(sqlalchemy.String(length=255), nullable=False)
+    is_in_byline = sqlalchemy.Column(
+        sqlalchemy.Boolean(),
+        nullable=False,
+        server_default='FALSE'
+    )
+
+
 class Person(lass.Base):
     """A person in the membership database."""
     __tablename__ = 'member'
