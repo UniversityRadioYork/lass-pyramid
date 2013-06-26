@@ -178,7 +178,7 @@ class Show(
             shows: A list of shows to annotate in-place.
         """
         cls.add_meta(shows, 'text', 'title', 'description', 'tags')
-        cls.add_meta(shows, 'image', 'thumbnail_image')
+        cls.add_meta(shows, 'image', 'thumbnail_image', 'player_image')
         cls.add_credits(shows, with_byline_attr='byline')
 
 
@@ -213,10 +213,10 @@ class Season(
     id = lass.common.rdbms.infer_primary_key(__tablename__)
 
     show_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Show.id))
-    show = sqlalchemy.orm.relationship(Show)
+    show = sqlalchemy.orm.relationship(Show, lazy='joined')
 
     term_id = sqlalchemy.Column('termid', sqlalchemy.ForeignKey(Term.id))
-    term = sqlalchemy.orm.relationship(Term)
+    term = sqlalchemy.orm.relationship(Term, lazy='joined')
 
     timeslots = sqlalchemy.orm.relationship('Timeslot')
 
@@ -226,12 +226,32 @@ class Season(
         return [lass.metadata.query.own(with_default=True)]
 
 
+class BaseTimeslot(object):
+    """The common level of functionality available on both data-model and
+    pseudo-timeslots.
+    """
+    def __init__(self, start_time, duration):
+        self.start_time = start_time
+        self.duration = duration
+
+    @property
+    def end_time(self):
+        """Returns the end time of the timeslot."""
+        return self.start_time + self.duration
+
+    @property
+    def start_date(self):
+        """Returns the start date (sans time) of the timeslot."""
+        return self.start_time.date()
+
+
 class Timeslot(
     lass.metadata.mixins.MetadataSubject,
     lass.people.mixins.Approvable,
     lass.people.mixins.Ownable,
     lass.Base,
-    ScheduleModel
+    ScheduleModel,
+    BaseTimeslot
 ):
     """A schedule timeslot."""
     __tablename__ = 'show_season_timeslot'
@@ -243,7 +263,7 @@ class Timeslot(
         'show_season_id',
         sqlalchemy.ForeignKey(Season.id)
     )
-    season = sqlalchemy.orm.relationship(Season)
+    season = sqlalchemy.orm.relationship(Season, lazy='joined')
 
     start_time = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
     duration = sqlalchemy.Column(sqlalchemy.Interval)

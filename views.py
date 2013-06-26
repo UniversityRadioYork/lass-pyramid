@@ -1,7 +1,10 @@
+import datetime
 import pyramid
-import yaml
 
+import lass.common.config
+import lass.common.time
 import lass.model_base
+import lass.schedule.filler
 import lass.schedule.lists
 import lass.schedule.models
 
@@ -12,8 +15,21 @@ class MockSchedule(object):
     @property
     def timeslots(self):
         if not hasattr(self, '_timeslots'):
-            self._timeslots = lass.schedule.lists.next(10)
-            lass.schedule.models.Timeslot.annotate(self._timeslots)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            unfilled = lass.schedule.lists.next(10, start_at=now)
+            if unfilled:
+                lass.schedule.models.Timeslot.annotate(unfilled)
+                start = min(unfilled[0].start_time, now)
+                end = unfilled[-1].end_time
+            else:
+                start = now
+                end = now
+            self._timeslots = lass.schedule.filler.fill(
+                unfilled,
+                lass.schedule.filler.filler_from_config(),
+                start_time=start,
+                end_time=end + datetime.timedelta(hours=24)
+            )
         return self._timeslots
 
 
@@ -33,23 +49,13 @@ def process_pages(request, pages):
 
 
 def make_website(request):
-    website = {}
+    website = lass.common.config.from_yaml('sitewide/website')
 
-    a = pyramid.path.AssetResolver()
-    with open(a.resolve('config:sitewide/website.yml').abspath()) as website_file:
-        website.update(yaml.load(website_file))
 
     if 'pages' in website:
         website['pages'] = process_pages(request, website['pages'])
 
     return website
-
-
-STREAMS = [
-    {'quality': 'high', 'kbps': 192, 'url': 'live-high.m3u'},
-    {'quality': 'low', 'kbps':  96, 'url': 'live-low.m3u'},
-    {'quality': 'mobile', 'kbps':  48, 'url': 'live-mobile.m3u'}
-]
 
 
 def get_page_title(request, current_url, website):
@@ -75,8 +81,12 @@ def standard_context(event):
 
     event.update(
         {
+            'now': lass.common.time.aware_now(),
+            'date_config': lass.common.time.load_date_config(),
+
             'current_schedule': MockSchedule(),
             'transmitting': True,
+            'broadcasting': True,
             'website': website,
             'static': static,
             'url': request.route_url,
@@ -95,20 +105,14 @@ def standard_context(event):
     route_name='contact',
     renderer='website/contact.jinja2'
 )
-def static(request):
-    """A view that can be used for static website pages.
-    """
-    return dict()
-
-
 @pyramid.view.view_config(
     route_name='listen',
     renderer='website/listen.jinja2'
 )
-def listen(request):
-    return {
-        'streams': STREAMS
-    }
+def static(request):
+    """A view that can be used for static website pages.
+    """
+    return dict()
 
 
 @pyramid.view.view_config(
