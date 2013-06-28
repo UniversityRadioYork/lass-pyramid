@@ -7,37 +7,21 @@ import lass.model_base
 import lass.schedule.models
 
 
-# Configure this at some point
-SHOWS_PER_PAGE = 25
 @pyramid.view.view_config(
     route_name='schedule-shows',
     renderer='schedule/shows.jinja2'
 )
-def show_list(request):
+def shows(request):
     """Displays a list of shows."""
-    all_shows = lass.schedule.models.Show.query.public(
-    ).in_showdb(
-    ).scheduled(
-    ).order_by(
-        sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+    return lass.common.view_helpers.media_list(
+        request,
+        lass.schedule.models.Show.query.public(
+        ).in_showdb(
+        ).scheduled(
+        ).order_by(
+            sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+        )
     )
-    page = int(request.params.get('page', 1))
-    show_page_count = math.ceil(all_shows.count() / SHOWS_PER_PAGE)
-
-    page = max(page, 1)
-    page = min(page, show_page_count)
-
-    shows = all_shows.slice(
-        (page - 1) * SHOWS_PER_PAGE, page * SHOWS_PER_PAGE
-    ).all()
-
-    lass.schedule.models.Show.annotate(shows)
-
-    return {
-        'shows': shows,
-        'pages': show_page_count,
-        'page': page,
-    }
 
 
 @pyramid.view.view_config(

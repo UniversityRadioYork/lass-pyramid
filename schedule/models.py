@@ -140,9 +140,6 @@ class Show(
     __tablename__ = 'show'
     query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
-    # Table override (remove if/when 'show_metadata' is moved)
-    meta_tables = {'text': 'show_metadata'}
-
     id = sqlalchemy.Column(
         'show_id',
         sqlalchemy.Integer,
