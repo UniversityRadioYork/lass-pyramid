@@ -30,6 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 from . import (
+    config,
+    mixins,
     rdbms,
-    mixins
+    time
 )

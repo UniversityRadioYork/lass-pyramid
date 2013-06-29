@@ -265,6 +265,11 @@ class Timeslot(
     start_time = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
     duration = sqlalchemy.Column(sqlalchemy.Interval)
 
+    @property
+    def can_be_messaged(self):
+        """Returns whether this timeslot can receive messages."""
+        return self.season.show.type.can_be_messaged
+
     @classmethod
     def meta_sources(cls):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
@@ -312,3 +317,28 @@ class Timeslot(
                     else:
                         show_timeslot.text[key] = value
 
+class Message(lass.Base):
+    """An entry in the SIS communication system."""
+    __tablename__ = 'messages'
+    __table_args__ = {'schema': 'sis2'}
+
+    # TODO: add in sister tables.
+
+    id = sqlalchemy.Column(
+        'commid',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+
+    timeslotid = sqlalchemy.Column(sqlalchemy.ForeignKey(Timeslot.id))
+    timeslot = sqlalchemy.orm.relationship(Timeslot, lazy='joined')
+    # Should be a foreign key to sis_commtype
+    commtypeid = sqlalchemy.Column(sqlalchemy.Integer)
+    sender = sqlalchemy.Column(sqlalchemy.String(64))
+    date = sqlalchemy.DateTime(timezone=True)
+    subject = sqlalchemy.Column(sqlalchemy.String(255))
+    content = sqlalchemy.Column(sqlalchemy.Text)
+    # Should be a foreign key to sis_status
+    statusid = sqlalchemy.Column(sqlalchemy.Integer)
+    comm_source = sqlalchemy.Column(sqlalchemy.String(15))

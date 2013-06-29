@@ -106,3 +106,76 @@ def timeslot_detail(request):
         'page_title': ((timeslot.text['title']) + ['Untitled'])[0],
         'timeslot': timeslot
     }
+
+@pyramid.view.view_config(
+    route_name='schedule-message',
+    request_method='POST',
+    request_param='comments'
+)
+def message(request):
+    """
+    Sends a message to the current show via the website.
+
+    """
+    # Current show
+    timeslot = lass.schedule.lists.next(1)[0]
+
+    # All redirects throw the user back at the index, with a query string set to
+    # let the template know what the result of the message send was.
+    # This should be extended eventually to allow redirects to a separate result
+    # page for use when doing the message send via AJAX.  That, or throw actual
+    # error/OK pages instead of redirects!
+    redirect = lambda r: pyramid.httpexceptions.HTTPSeeOther(
+        location=request.route_url(
+            'index',
+            _query={'msg_result': r}
+        )
+    )
+
+    if not timeslot.can_be_messaged():
+        raise redirect('no_msg')
+
+    message = request.params['comments']
+
+    message_config = lass.common.config.from_yaml('sitewide/message')
+    spam = [
+        '[url=',
+        '<a href=',
+        '&lt;a href='
+    ]
+    message_l = message.lower()
+
+    # Rudimentary spam check
+    spam = message_config['spam']
+    if any(x.lower() in message_l for x in spam):
+        raise redirect('spam')
+
+    # Social engineering filter
+    warns = message_config['warns']
+    message_parts = []
+    for warn in warns:
+        if any(x.lower() in message_l for x in warn['triggers']):
+            message_parts.append(
+                '<div class="ui-state-highlight"><span>{}</span></div>'.format(
+                    warn['messages']
+                )
+            )
+    message_parts.append(message)
+    message = ''.join(message_parts.reverse())
+
+    message_comm = lass.schedule.models.Message(
+        commtypeid=3,  # Website communication
+        sender='URY Website',
+        timeslotid=timeslot.id,
+        subject=message[:255],
+        content=message,
+        date=lass.common.time.aware_now(),
+        statusid=1,  # Unread
+        comm_source=request.client_addr
+    )
+    lass.DBSession.add(message_comm)
+    lass.DBSession.commit()
+
+    result = redirect('index')
+    return result
+
