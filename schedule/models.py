@@ -83,14 +83,14 @@ class ShowQuery(sqlalchemy.orm.Query):
         return self.filter(Show.seasons.any(Season.timeslots.any()))
 
 
-class ScheduleModel(object):
+class ScheduleModel(lass.model_base.Base):
     """Base for all schedule models."""
+    __abstract__ = True
     __table_args__ = {'schema': 'schedule'}
 
 
 class ShowType(
     lass.common.mixins.Type,
-    lass.Base,
     ScheduleModel
 ):
     """A type of show in the schedule.
@@ -134,7 +134,6 @@ class Show(
     lass.metadata.mixins.MetadataSubject,
     lass.people.mixins.PersonSubmittable,
     lass.people.mixins.Creditable,
-    lass.Base,
     ScheduleModel
 ):
     __tablename__ = 'show'
@@ -197,7 +196,6 @@ class Term(lass.Base):
 class Season(
     lass.metadata.mixins.MetadataSubject,
     lass.people.mixins.PersonSubmittable,
-    lass.Base,
     ScheduleModel
 ):
     """A show season.
@@ -246,7 +244,6 @@ class Timeslot(
     lass.metadata.mixins.MetadataSubject,
     lass.people.mixins.Approvable,
     lass.people.mixins.Ownable,
-    lass.Base,
     ScheduleModel,
     BaseTimeslot
 ):
@@ -317,7 +314,7 @@ class Timeslot(
                     else:
                         show_timeslot.text[key] = value
 
-class Message(lass.Base):
+class Message(lass.model_base.Base):
     """An entry in the SIS communication system."""
     __tablename__ = 'messages'
     __table_args__ = {'schema': 'sis2'}
