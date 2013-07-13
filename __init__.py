@@ -7,7 +7,8 @@ from .model_base import (
 )
 
 from . import (
-    common
+    common,
+    model_base
 )
 
 
