@@ -122,5 +122,7 @@ Queries
     :show-inheritance:
 """
 
-
-__version__ = '0.0.1'
+from . import (
+    mixins,
+    models
+)
