@@ -37,7 +37,6 @@ def process_pages(request, pages):
 def make_website(request):
     website = lass.common.config.from_yaml('sitewide/website')
 
-
     if 'pages' in website:
         website['pages'] = process_pages(request, website['pages'])
 
@@ -59,6 +58,7 @@ def standard_context(event):
     request = event['request']
 
     website = make_website(request)
+
     try:
         current_url = pyramid.url.current_route_url(request)
     except ValueError:
@@ -69,7 +69,9 @@ def standard_context(event):
             'now': lass.common.time.aware_now(),
             'date_config': lass.common.time.load_date_config(),
 
-            'current_schedule': MockSchedule(),
+            'current_schedule': lass.schedule.lists.Lazy(
+                lambda: lass.schedule.lists.next(10)
+            ),
             'transmitting': True,
             'broadcasting': True,
             'website': website,

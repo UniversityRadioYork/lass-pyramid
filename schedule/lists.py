@@ -9,6 +9,41 @@ import lass.common.time
 import lass.schedule.filler
 
 
+class Lazy(object):
+    """Lazy loader/cache for schedule lists."""
+    def __init__(self, function):
+        """Initialises the lazy loader.
+
+        Args:
+            function: A zero-arguments lambda/thunk to evaluate to retrieve
+            the schedule data.  Usually should be of the form
+            "lambda: f(foo, bar, baz)".
+
+        Returns:
+            A Lazy object.
+        """
+        self.function = function
+        self.stored = False
+        self.contents = None
+
+    @property
+    def timeslots(self):
+        """Retrieves the list of timeslots this Lazy object is set to retrieve.
+
+        If the timeslots have not yet been retrieved, this will invoke the
+        retrieval function and then save the results for future calls on this
+        object only.
+
+        Returns:
+            The list of timeslots this Lazy object has been directed to compute.
+        """
+        if not self.stored:
+            self.contents = self.function()
+            self.stored = True
+
+        return self.contents
+
+
 def next(count, start_at=None):
     """Selects the next 'count' shows, including the currently playing timeslot,
     and performs filling and annotating.
@@ -25,7 +60,7 @@ def next(count, start_at=None):
         one day in length.
     """
     if not start_at:
-        start_at = lass.common.time.aware_now
+        start_at = lass.common.time.aware_now()
 
     raw = lass.schedule.lists.next_raw(count, start_at)
     if raw:
