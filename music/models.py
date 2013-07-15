@@ -34,6 +34,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import itertools
+import operator
 import sqlalchemy
 
 import lass.model_base
@@ -329,9 +331,10 @@ class MusicModel(lass.model_base.Base):
     __table_args__ = {'schema': 'music'}
 
 
-class ChartType(lass.common.mixins.Type, MusicModel):
+class Chart(lass.common.mixins.Type, MusicModel):
     """A type of chart."""
     __tablename__ = 'chart_type'
+    query = lass.model_base.DBSession.query_property()
 
     id = sqlalchemy.Column(
         'chart_type_id',
@@ -339,6 +342,81 @@ class ChartType(lass.common.mixins.Type, MusicModel):
         primary_key=True,
         nullable=False
     )
+    releases = sqlalchemy.orm.relationship('ChartRelease', backref='chart')
+
+    @classmethod
+    def latest(cls, chart_name, on_date=None):
+        """Retrieves the latest chart with a given name.
+
+        The chart will be pre-formatted into a list of rows in the form
+        [Last Chart Position, Current Position, Track].
+
+        If 'on_date' is given and not None, then the chart that was latest on
+        that date will be retrieved instead.
+
+        Args:
+            chart_name: The name of the chart, for example 'music' (Recommended
+                Listening) or 'chart' (the chart proper).
+            on_date: The datetime for which the latest (relatively speaking)
+                chart is sought.  If None, use the current datetime.
+                (Default: None.)
+        """
+        if on_date is None:
+            on_date = lass.common.time.aware_now()
+
+        releases = lass.model_base.DBSession.query(
+            ChartRelease.id
+        ).join(
+            cls
+        ).filter(
+            (cls.name == chart_name) &
+            (ChartRelease.submitted_at <= on_date)
+        ).order_by(
+            sqlalchemy.desc(ChartRelease.submitted_at)
+        ).limit(2)
+
+        rows = lass.model_base.DBSession.query(
+            ChartRelease.id,
+            ChartRow.position.label('position'),
+            Track
+        ).join(
+            ChartRow.track,
+            ChartRow.release
+        ).filter(
+            ChartRelease.id.in_(releases)
+        ).order_by(
+            sqlalchemy.desc(ChartRelease.submitted_at),
+            sqlalchemy.asc(ChartRow.position)
+        ).all()
+
+        # Split rows into releases
+        # Rows should come out as (release, position, track)
+        raw = [
+            list(v)
+            for _, v in itertools.groupby(rows, operator.itemgetter(0))
+        ]
+
+        try:
+            current = raw[0]
+        except IndexError:
+            result = None
+        else:
+            try:
+                last = raw[1]
+            except IndexError:
+                last = []
+
+            # Work out last positions in a slightly interesting way that'll
+            # fall over mildly if the same track appears multiple times on the
+            # previous week chart.
+            last_posns = {track.id: position for _, position, track in last}
+
+            result = [
+                [last_posns.get(track.id), position, track]
+                for _, position, track in current
+            ]
+
+        return result
 
 
 class ChartRelease(lass.common.mixins.Submittable, MusicModel):
@@ -352,10 +430,11 @@ class ChartRelease(lass.common.mixins.Submittable, MusicModel):
         nullable=False
     )
     chart_type_id = sqlalchemy.Column(
-        sqlalchemy.ForeignKey('music.chart_type.chart_type_id'),
+        sqlalchemy.ForeignKey(Chart.id),
         nullable=False
     )
-    type = sqlalchemy.orm.relationship(ChartType)
+    rows = sqlalchemy.orm.relationship('ChartRow', backref='release')
+    # Backref 'chart' from Chart.releases
 
 
 class ChartRow(MusicModel):
@@ -369,10 +448,11 @@ class ChartRow(MusicModel):
         nullable=False
     )
     chart_release_id = sqlalchemy.Column(
-        sqlalchemy.ForeignKey('music.chart_release.chart_release_id'),
+        sqlalchemy.ForeignKey(ChartRelease.id),
         nullable=False
     )
-    chart_release = sqlalchemy.orm.relationship(ChartRelease)
 
     position = sqlalchemy.Column(sqlalchemy.SmallInteger, nullable=False)
-    trackid = sqlalchemy.Column(sqlalchemy.ForeignKey('rec_track.trackid'))
+    trackid = sqlalchemy.Column(sqlalchemy.ForeignKey(Track.id))
+    track = sqlalchemy.orm.relationship(Track, lazy='joined')
+    # Backref 'release' from ChartRelease.rows
