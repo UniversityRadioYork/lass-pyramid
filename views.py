@@ -1,4 +1,3 @@
-import datetime
 import pyramid
 
 import lass.common.config
@@ -43,14 +42,16 @@ def make_website(request):
     return website
 
 
-def get_page_title(request, current_url, website):
-    """Looks up the page title corresponding to the request's view name."""
+def get_page(request, current_url, website):
+    """Looks up the current page and its title in the page configuration."""
     page_title = 'Untitled'
-    for pt, page in website['pages'].items():
-        if current_url == page['target']:
-            page_title = pt
+    page = None
+    for c_title, c_page in website['pages'].items():
+        if current_url == c_page['target']:
+            page_title = c_title
+            page = c_page
             break
-    return page_title
+    return page, page_title
 
 
 @pyramid.events.subscriber(pyramid.events.BeforeRender)
@@ -64,6 +65,8 @@ def standard_context(event):
     except ValueError:
         current_url = None
 
+    page, page_title = get_page(request, current_url, website)
+
     event.update(
         {
             'now': lass.common.time.aware_now(),
@@ -72,11 +75,13 @@ def standard_context(event):
             'current_schedule': lass.schedule.lists.Lazy(
                 lambda: lass.schedule.lists.next(10)
             ),
+            'service_state': lass.schedule.service.State(),
             'transmitting': True,
             'broadcasting': True,
             'website': website,
             'raw_url': lambda r: request.route_url('home') + r,
             'current_url': current_url,
-            'page_title': get_page_title(request, current_url, website),
+            'page_title': page_title,
+            'page': page
         }
     )

@@ -192,6 +192,26 @@ class Term(lass.Base):
     end = sqlalchemy.Column('finish', sqlalchemy.DateTime(timezone=True))
     name = sqlalchemy.Column('descr', sqlalchemy.String(length=10))
 
+    @classmethod
+    def of(datetime):
+        """Returns the term of the given datetime.
+
+        If the date lies outside a term, the last active term is returned.
+        This case can easily be distinguished by checking the returned term's
+        'end' attribute.
+
+        Args:
+            datetime: An aware datetime for which a corresponding term is
+                sought.
+
+        Returns:
+            The term on the date, or the last active term if none exists.
+            Technically, this returns the last term to start before the date.
+        """
+        return 
+
+
+
 
 class Season(
     lass.metadata.mixins.MetadataSubject,
@@ -262,6 +282,58 @@ class Timeslot(
     start_time = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
     duration = sqlalchemy.Column(sqlalchemy.Interval)
 
+    tracklistings = sqlalchemy.orm.relationship(
+        lass.music.models.TrackListing,
+        backref='timeslot'
+    )
+
+    @property
+    def tracklist(self):
+        """Returns a list of tracks played during this timeslot.
+
+        This runs one database query per usage.
+        """
+        in_library = lass.model_base.DBSession.query(
+            lass.music.models.Track.title.label('track'),
+            lass.music.models.Track.artist.label('artist'),
+            lass.music.models.Record.title.label('record'),
+            lass.music.models.TrackListing.timestart.label('played_at')
+        ).select_from(
+            lass.music.models.TrackListing
+        ).join(
+            lass.music.models.TrackListingLibraryTrack,
+            lass.music.models.TrackListingLibraryTrack.track,
+            lass.music.models.TrackListingLibraryTrack.record
+        )
+
+        out_library = lass.model_base.DBSession.query(
+            lass.music.models.TrackListingCustomTrack.track.label('track'),
+            lass.music.models.TrackListingCustomTrack.artist.label('artist'),
+            lass.music.models.TrackListingCustomTrack.album.label('record'),
+            lass.music.models.TrackListing.timestart.label('played_at')
+        ).select_from(
+            lass.music.models.TrackListing
+        ).join(
+            lass.music.models.TrackListingCustomTrack
+        )
+
+        return self.tracklist_filter(in_library).union(
+            self.tracklist_filter(out_library)
+        ).order_by(
+            sqlalchemy.asc('played_at')
+        ).all()
+
+    def tracklist_filter(self, query):
+        """Performs filtering for the tracklist mini-queries."""
+        return query.filter(
+            (lass.music.models.TrackListing.timeslotid == self.id) &
+            (
+                (lass.music.models.TrackListing.state_id == None) |
+                (~lass.music.models.TrackListing.state_id.in_(['o', 'd']))
+            )
+        )
+
+
     @property
     def can_be_messaged(self):
         """Returns whether this timeslot can receive messages."""
@@ -313,6 +385,7 @@ class Timeslot(
                         show_timeslot.text[key] += value
                     else:
                         show_timeslot.text[key] = value
+
 
 class Message(lass.model_base.Base):
     """An entry in the SIS communication system."""

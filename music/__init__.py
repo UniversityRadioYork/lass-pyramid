@@ -1,4 +1,8 @@
-"""Views for the Website submodule of the URY website.
+"""The Music submodule of the URY website.
+
+This submodule implements parts of the track library, chart system and other
+music-related bits and pieces the website uses, as well as being the home of any
+music microsites.
 
 ---
 
@@ -26,51 +30,6 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-import pyramid
-
-import lass.common.config
-import lass.website.models
-
-
-@pyramid.view.view_config(
-    route_name='about',
-    renderer='website/about.jinja2'
+from . import (
+    models
 )
-@pyramid.view.view_config(
-    route_name='listen',
-    renderer='website/listen.jinja2'
-)
-def static(_):
-    """A view that can be used for static website pages."""
-    return {}
-
-
-@pyramid.view.view_config(
-    route_name='contact',
-    renderer='website/contact.jinja2'
-)
-def contact(_):
-    """The view for the Contact Us page."""
-    return lass.common.config.from_yaml('sitewide/contacts')
-
-
-@pyramid.view.view_config(
-    route_name='home',
-    renderer='website/index.jinja2'
-)
-def home(_):
-    """The view for the index page."""
-    return {
-        'page_title': 'Home',
-        'banners': lass.website.models.Banner.for_location('index')
-    }
-
-
-@pyramid.view.notfound_view_config(
-    renderer='errors/404.jinja2',
-    append_slash=True
-)
-def not_found(*_):
-    return {
-        'page_title': 'Not Found'
-    }
