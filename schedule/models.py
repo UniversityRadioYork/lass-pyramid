@@ -36,9 +36,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sqlalchemy
 
-from .. import Base
 import lass.common
 import lass.metadata
+import lass.music
+import lass.model_base
 import lass.people.mixins
 
 
@@ -181,6 +182,7 @@ class Show(
 class Term(lass.Base):
     # NB: Term is not in the schedule schema.
     __tablename__ = 'terms'
+    query = lass.model_base.DBSession.query_property()
 
     id = sqlalchemy.Column(
         'termid',
@@ -193,7 +195,7 @@ class Term(lass.Base):
     name = sqlalchemy.Column('descr', sqlalchemy.String(length=10))
 
     @classmethod
-    def of(datetime):
+    def of(cls, datetime):
         """Returns the term of the given datetime.
 
         If the date lies outside a term, the last active term is returned.
@@ -202,15 +204,21 @@ class Term(lass.Base):
 
         Args:
             datetime: An aware datetime for which a corresponding term is
-                sought.
+                sought.  If None, the current time will be used.
+                (Default: None.)
 
         Returns:
             The term on the date, or the last active term if none exists.
             Technically, this returns the last term to start before the date.
         """
-        return 
+        if datetime is None:
+            datetime = lass.common.time.aware_now()
 
-
+        return cls.query.filter(
+            cls.start <= datetime
+        ).order_by(
+            sqlalchemy.desc(cls.start)
+        ).first()
 
 
 class Season(

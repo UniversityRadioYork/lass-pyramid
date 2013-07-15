@@ -72,13 +72,13 @@ class State(object):
         """Returns the term any active show seasons will belong to."""
         return self._lazy(
             'term',
-            (lambda: lass.schedule.models.Term.on(self.at_time))
+            (lambda: lass.schedule.models.Term.of(self.at_time))
         )
 
     @property
     def can_listen(self):
         """Returns whether or not the station is formally listenable to."""
-        return (self.service_type in 'down')
+        return (self.service_type != 'down')
 
     @property
     def programming_available(self):
@@ -161,7 +161,7 @@ def service_type(at_time=None, term=None, service_config=None):
         use_overrides = False
 
     if term is None:
-        term = lass.schedule.models.Term.on(at_time)
+        term = lass.schedule.models.Term.of(at_time)
     if service_config is None:
         service_config = read_config
 
