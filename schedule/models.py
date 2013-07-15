@@ -159,7 +159,11 @@ class Show(
         sqlalchemy.DateTime(timezone=True)
     )
 
-    seasons = sqlalchemy.orm.relationship('Season')
+    seasons = sqlalchemy.orm.relationship(
+        'Season',
+        backref=sqlalchemy.orm.backref('show', lazy='joined'),
+        order_by='Season.term_id'
+    )
 
     @classmethod
     def meta_sources(cls):
@@ -231,17 +235,20 @@ class Season(
     Seasons map onto terms of scheduled timeslots for a show.
     """
     __tablename__ = 'show_season'
-    query = lass.model_base.DBSession.query_property()
+    query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
     id = lass.common.rdbms.infer_primary_key(__tablename__)
 
     show_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Show.id))
-    show = sqlalchemy.orm.relationship(Show, lazy='joined')
 
     term_id = sqlalchemy.Column('termid', sqlalchemy.ForeignKey(Term.id))
     term = sqlalchemy.orm.relationship(Term, lazy='joined')
 
-    timeslots = sqlalchemy.orm.relationship('Timeslot')
+    timeslots = sqlalchemy.orm.relationship(
+        'Timeslot',
+        backref=sqlalchemy.orm.backref('season', lazy='joined'),
+        order_by='Timeslot.start_time'
+    )
 
     @classmethod
     def meta_sources(cls, meta_type):
@@ -285,7 +292,7 @@ class Timeslot(
         'show_season_id',
         sqlalchemy.ForeignKey(Season.id)
     )
-    season = sqlalchemy.orm.relationship(Season, lazy='joined')
+    #season = sqlalchemy.orm.relationship(Season, lazy='joined')
 
     start_time = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
     duration = sqlalchemy.Column(sqlalchemy.Interval)

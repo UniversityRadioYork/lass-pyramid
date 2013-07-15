@@ -29,13 +29,20 @@ def shows(request):
     renderer='schedule/show_detail.jinja2'
 )
 def show_detail(request):
-    """Displays detail about a show."""
+    """Displays detail about a show.
+
+    This view expects the show's seasons to be listed, and thus these are
+    eagerly loaded.
+    """
 
     # Make sure the ID corresponds to a show that has a ShowDB entry.
     show_id = request.matchdict['showid']
-    show = lass.schedule.models.Show.query.in_showdb(
+    show = lass.schedule.models.Show.query.in_showdb().join(
+        lass.schedule.models.Show.seasons
     ).filter(
         lass.schedule.models.Show.id == show_id
+    ).options(
+        sqlalchemy.orm.contains_eager(lass.schedule.models.Show.seasons)
     ).first()
     if not show:
         raise pyramid.exceptions.NotFound(
@@ -47,7 +54,6 @@ def show_detail(request):
     lass.schedule.models.Show.annotate([show])
 
     return {
-        'page_title': ((show.text['title']) + ['Untitled'])[0],
         'show': show
     }
     
@@ -57,13 +63,18 @@ def show_detail(request):
     renderer='schedule/season_detail.jinja2'
 )
 def season_detail(request):
-    """Displays detail about a season."""
+    """Displays detail about a season.
+
+    This view expects the season's timeslots to be listed, and thus these are
+    eagerly loaded.
+    """
 
     # Make sure the ID corresponds to a season that has a ShowDB entry.
     season_id = request.matchdict['seasonid']
-    season = lass.schedule.models.Season.query.filter(
-        lass.schedule.models.ShowType.has_showdb_entry,
+    season = lass.schedule.models.Season.query.in_showdb().filter(
         lass.schedule.models.Season.id == season_id
+    ).options(
+        sqlalchemy.orm.joinedload(lass.schedule.models.Season.timeslots)
     ).first()
     if not season:
         raise pyramid.exceptions.NotFound(
@@ -75,7 +86,6 @@ def season_detail(request):
     lass.schedule.models.Show.annotate([season.show])
 
     return {
-        'page_title': ((season.show.text['title']) + ['Untitled'])[0],
         'season': season
     }
 
@@ -103,9 +113,9 @@ def timeslot_detail(request):
     lass.schedule.models.Timeslot.annotate([timeslot])
 
     return {
-        'page_title': ((timeslot.text['title']) + ['Untitled'])[0],
         'timeslot': timeslot
     }
+
 
 @pyramid.view.view_config(
     route_name='schedule-message',
