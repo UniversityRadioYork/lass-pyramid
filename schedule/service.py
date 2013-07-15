@@ -49,7 +49,7 @@ class State(object):
     information.
     """
     def __init__(self, at_time=None, service_config=None):
-        """Initialises a LazyState.
+        """Initialises a State.
 
         Args:
             at_time: The time at which we are checking the service state.
