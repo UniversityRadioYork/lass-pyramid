@@ -10,62 +10,37 @@ import lass.schedule.models
 STATIC = 'assets:static'
 
 
-class MockSchedule(object):
-    @property
-    def timeslots(self):
-        if not hasattr(self, '_timeslots'):
-            self._timeslots = lass.schedule.lists.next(10)
-        return self._timeslots
-
-
-def process_pages(request, pages):
-    new_pages = {}
-    for name, page in pages.items():
-        target = page['target']
-
-        new_page = page
-
-        # Expand out route-based targets.
-        if target.startswith('~'):
-            new_page['target'] = request.route_url(target[1:])
-
-        new_pages[name] = new_page
-    return new_pages
-
-
-def make_website(request):
-    website = lass.common.config.from_yaml('sitewide/website')
-
-    if 'pages' in website:
-        website['pages'] = process_pages(request, website['pages'])
-
-    return website
-
-
 def get_page(request, current_url, website):
     """Looks up the current page and its title in the page configuration."""
-    page_title = 'Untitled'
-    page = None
-    for c_title, c_page in website['pages'].items():
-        if current_url == c_page['target']:
-            page_title = c_title
-            page = c_page
-            break
-    return page, page_title
+    page = {}
+    title = 'Untitled'
+
+    if request.matched_route:
+        rname = request.matched_route.name
+        try:
+            title, page = next(
+                (t, p) for t, p in website['pages'].items()
+                if rname == p.get('route')
+            )
+        except StopIteration:
+            # Yield the default page/title above
+            pass
+    else:
+        title = 'Not Found'
+
+    return dict(page, title=title)
 
 
 @pyramid.events.subscriber(pyramid.events.BeforeRender)
 def standard_context(event):
     request = event['request']
 
-    website = make_website(request)
+    website = lass.common.config.from_yaml('sitewide/website')
 
     try:
         current_url = pyramid.url.current_route_url(request)
     except ValueError:
         current_url = None
-
-    page, page_title = get_page(request, current_url, website)
 
     event.update(
         {
@@ -76,12 +51,9 @@ def standard_context(event):
                 lambda: lass.schedule.lists.next(10)
             ),
             'service_state': lass.schedule.service.State(),
-            'transmitting': True,
-            'broadcasting': True,
             'website': website,
             'raw_url': lambda r: request.route_url('home') + r,
             'current_url': current_url,
-            'page_title': page_title,
-            'page': page
+            'this_page': get_page(request, current_url, website)
         }
     )
