@@ -1,5 +1,3 @@
-import math
-
 import pyramid
 import sqlalchemy
 
@@ -118,6 +116,18 @@ def timeslot_detail(request):
 
 
 @pyramid.view.view_config(
+    route_name='schedule'
+)
+def schedule(request):
+    """The main schedule view.
+
+    Currently this redirects to this week's schedule.
+    """
+
+    raise pyramid.exceptions.NotFound('TODO: implement this')
+
+
+@pyramid.view.view_config(
     route_name='schedule-message',
     request_method='POST',
     request_param='comments'
@@ -188,4 +198,3 @@ def message(request):
 
     result = redirect('index')
     return result
-
