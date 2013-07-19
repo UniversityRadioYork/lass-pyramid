@@ -93,6 +93,7 @@ def local_midnight_on(date, date_config):
 
 
 def load_date_config():
+    """Loads and pre-processes the website date configuration file."""
     raw_config = lass.common.config.from_yaml('sitewide/time')
 
     timezone = pytz.timezone(raw_config['timezone'])
@@ -114,3 +115,25 @@ def load_date_config():
         }
     )
     return config
+
+
+#
+# These next two functions were purloined from
+# http://stackoverflow.com/q/304256
+#
+
+
+def iso_year_start(iso_year):
+    """The gregorian calendar date of the first day of the given ISO year."""
+    fourth_jan = datetime.date(iso_year, 1, 4)
+    delta = datetime.timedelta(fourth_jan.isoweekday()-1)
+    return fourth_jan - delta
+
+
+def iso_to_gregorian(iso_year, iso_week, iso_day):
+    """Gregorian calendar date for the given ISO year, week and day."""
+    year_start = iso_year_start(iso_year)
+    return year_start + datetime.timedelta(
+        days=iso_day-1,
+        weeks=iso_week-1
+    )

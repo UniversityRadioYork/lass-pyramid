@@ -129,6 +129,31 @@ def schedule(request):
 
 
 @pyramid.view.view_config(
+    route_name='schedule-year-week-day',
+    renderer='schedule/day.jinja2'
+)
+def year_week_day(request):
+    """Shows the schedule for a specific day given in ISO Y/W/D format."""
+    # Try to convert the incoming date information to Python representation
+    try:
+        start_date = lass.common.time.iso_to_gregorian(
+            **{
+                'iso_' + k: int(v)
+                for k, v in request.matchdict.items()
+                if k in ('year', 'week', 'day')
+            }
+        )
+    except ValueError:
+        raise pyramid.exceptions.NotFound(
+            'Invalid date: {year}-W{week}-{day}'.format_map(
+                request.matchdict
+            )
+        )
+
+    return day(request, start_date)
+
+
+@pyramid.view.view_config(
     route_name='schedule-year-month-day',
     renderer='schedule/day.jinja2'
 )
@@ -150,6 +175,11 @@ def year_month_day(request):
             )
         )
 
+    return day(request, start_date)
+
+
+def day(request, start_date):
+    """Common body for all day schedule views."""
     conf = lass.common.time.load_date_config()
     duration = datetime.timedelta(days=1)
 
