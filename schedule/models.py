@@ -58,7 +58,7 @@ class ShowQuery(sqlalchemy.orm.Query):
 
     def public(self):
         """Filters this Query down to public shows only.
-        
+
         Returns:
             This query, filtered to show only public shows as defined by their
             ShowType.
@@ -67,7 +67,7 @@ class ShowQuery(sqlalchemy.orm.Query):
 
     def private(self):
         """Filters this Query down to private shows only.
-        
+
         Returns:
             This query, filtered to exclude public shows as defined by their
             ShowType.
@@ -76,7 +76,7 @@ class ShowQuery(sqlalchemy.orm.Query):
 
     def scheduled(self):
         """Filters this Query down to shows that have scheduled slots.
-        
+
         Returns:
             This query, filtered to show only shows (public or otherwise) that
             have scheduled timeslots.
@@ -95,7 +95,7 @@ class ShowType(
     ScheduleModel
 ):
     """A type of show in the schedule.
-    
+
     The URY schedule, in addition to normal shows, also tracks various
     show-like entities such as demos and reservations, as well as filler slots
     (the URY Jukebox).
@@ -166,6 +166,24 @@ class Show(
     )
 
     @classmethod
+    def public(cls):
+        """Retrieves a Query of all public shows."""
+        return cls.query.join(
+            'type'
+        ).options(
+            sqlalchemy.orm.contains_eager('type')
+        ).filter(ShowType.is_public)
+
+    @classmethod
+    def in_showdb(cls):
+        """Retrieves a Query of all shows in the Show Database."""
+        return cls.query.join(
+            'type'
+        ).options(
+            sqlalchemy.orm.contains_eager(cls.type)
+        ).filter(ShowType.is_public & ShowType.in_showdb)
+
+    @classmethod
     def meta_sources(cls):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
         return [lass.metadata.query.own(with_default=True)]
@@ -195,7 +213,7 @@ class Term(lass.Base):
         nullable=False
     )
     start = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
-    end = sqlalchemy.Column('finish', sqlalchemy.DateTime(timezone=True))
+    finish = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
     name = sqlalchemy.Column('descr', sqlalchemy.String(length=10))
 
     @classmethod
@@ -204,7 +222,7 @@ class Term(lass.Base):
 
         If the date lies outside a term, the last active term is returned.
         This case can easily be distinguished by checking the returned term's
-        'end' attribute.
+        'finish' attribute.
 
         Args:
             datetime: An aware datetime for which a corresponding term is
@@ -247,7 +265,7 @@ class Season(
     timeslots = sqlalchemy.orm.relationship(
         'Timeslot',
         backref=sqlalchemy.orm.backref('season', lazy='joined'),
-        order_by='Timeslot.start_time'
+        order_by='Timeslot.start'
     )
 
     @classmethod
@@ -260,19 +278,19 @@ class BaseTimeslot(object):
     """The common level of functionality available on both data-model and
     pseudo-timeslots.
     """
-    def __init__(self, start_time, duration):
-        self.start_time = start_time
+    def __init__(self, start, duration):
+        self.start = start
         self.duration = duration
 
     @property
-    def end_time(self):
-        """Returns the end time of the timeslot."""
-        return self.start_time + self.duration
+    def finish(self):
+        """Returns the datetime of the end of this timeslot."""
+        return self.start + self.duration
 
     @property
     def start_date(self):
         """Returns the start date (sans time) of the timeslot."""
-        return self.start_time.date()
+        return self.start.date()
 
 
 class Timeslot(
@@ -284,7 +302,7 @@ class Timeslot(
 ):
     """A schedule timeslot."""
     __tablename__ = 'show_season_timeslot'
-    query = lass.model_base.DBSession.query_property()
+    query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
     id = lass.common.rdbms.infer_primary_key(__tablename__)
 
@@ -292,9 +310,9 @@ class Timeslot(
         'show_season_id',
         sqlalchemy.ForeignKey(Season.id)
     )
-    #season = sqlalchemy.orm.relationship(Season, lazy='joined')
+    # 'season' will appear here as a backref from Seasons.
 
-    start_time = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
+    start = sqlalchemy.Column('start_time', sqlalchemy.DateTime(timezone=True))
     duration = sqlalchemy.Column(sqlalchemy.Interval)
 
     tracklistings = sqlalchemy.orm.relationship(
@@ -347,7 +365,6 @@ class Timeslot(
                 (~lass.music.models.TrackListing.state_id.in_(['o', 'd']))
             )
         )
-
 
     @property
     def can_be_messaged(self):

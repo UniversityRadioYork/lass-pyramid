@@ -61,7 +61,6 @@ def contact(_):
 def home(_):
     """The view for the index page."""
     return {
-        'page_title': 'Home',
         'banners': lass.website.models.Banner.for_location('index')
     }
 
@@ -70,7 +69,7 @@ def home(_):
     renderer='errors/404.jinja2',
     append_slash=True
 )
-def not_found(*_):
-    return {
-        'page_title': 'Not Found'
-    }
+def not_found(request, *_):
+    request.response.status = '404 Not Found'
+
+    return {}

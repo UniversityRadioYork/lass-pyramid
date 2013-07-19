@@ -138,7 +138,7 @@ class Banner(WebsiteModel):
                     # ...has a timeslot we're currently in.
                     (BannerTimeslot.day == when.isoweekday()) &
                     (BannerTimeslot.start_time <= when.time()) &
-                    (BannerTimeslot.end_time > when.time())
+                    (BannerTimeslot.finish_time > when.time())
                     # (Phew!)
                 )
             )
@@ -189,4 +189,4 @@ class BannerTimeslot(
     day = sqlalchemy.Column(sqlalchemy.SmallInteger)
 
     start_time = sqlalchemy.Column(sqlalchemy.Time(timezone=True))
-    end_time = sqlalchemy.Column(sqlalchemy.Time(timezone=True))
+    finish_time = sqlalchemy.Column('end_time', sqlalchemy.Time(timezone=True))

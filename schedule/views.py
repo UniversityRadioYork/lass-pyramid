@@ -1,3 +1,4 @@
+import datetime
 import pyramid
 import sqlalchemy
 
@@ -13,7 +14,7 @@ def shows(request):
     """Displays a list of shows."""
     return lass.common.view_helpers.media_list(
         request,
-        lass.schedule.models.Show.query.public(
+        lass.schedule.models.Show.public(
         ).in_showdb(
         ).scheduled(
         ).order_by(
@@ -128,6 +129,53 @@ def schedule(request):
 
 
 @pyramid.view.view_config(
+    route_name='schedule-year-month-day',
+    renderer='schedule/day.jinja2'
+)
+def year_month_day(request):
+    """Shows the schedule for a specific day given in Y/M/D format."""
+    # Try to convert the incoming date information to Python representation
+    try:
+        start_date = datetime.date(
+            **{
+                k: int(v)
+                for k, v in request.matchdict.items()
+                if k in ('year', 'month', 'day')
+            }
+        )
+    except ValueError:
+        raise pyramid.exceptions.NotFound(
+            'Invalid date: {year}-{month}-{day}'.format_map(
+                request.matchdict
+            )
+        )
+
+    conf = lass.common.time.load_date_config()
+    duration = datetime.timedelta(days=1)
+
+    # Make sure we start and finish at the start of programming, which
+    # is a local time - this may mean some days are longer or shorter than
+    # 24 hours due to DST.
+    start = lass.common.time.start_on(start_date, conf)
+    finish = lass.common.time.start_on(
+        start_date + datetime.timedelta(days=1),
+        conf
+    )
+    duration = finish - start
+
+    return {
+        'start': start,
+        'finish': finish,
+        'duration': duration,
+        'day_schedule': lass.schedule.lists.Schedule(
+            creator=lass.schedule.lists.from_to,
+            start=start,
+            finish=finish
+        )
+    }
+
+
+@pyramid.view.view_config(
     route_name='schedule-message',
     request_method='POST',
     request_param='comments'
@@ -158,11 +206,6 @@ def message(request):
     message = request.params['comments']
 
     message_config = lass.common.config.from_yaml('sitewide/message')
-    spam = [
-        '[url=',
-        '<a href=',
-        '&lt;a href='
-    ]
     message_l = message.lower()
 
     # Rudimentary spam check

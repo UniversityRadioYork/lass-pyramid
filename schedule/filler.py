@@ -34,13 +34,17 @@ import lass.common.config
 import lass.schedule.models
 
 
+ZERO = datetime.timedelta(seconds=0)
+
+
 class FillerTimeslot(lass.schedule.models.BaseTimeslot):
     """An object representing a filler timeslot.
     
-    Filler timeslots are mostly compatible with regular timeslots, but their
-    start and duration are always None, and their """
-    def __init__(self, start_time, duration, metadata=None):
-        super().__init__(start_time, duration)
+    Filler timeslots are mostly compatible with regular timeslots, but have
+    pre-applied "fake" metadata, and have no attached seasons or shows.
+    """
+    def __init__(self, start, duration, metadata=None):
+        super().__init__(start, duration)
         for attr, contents in metadata.items():
             setattr(self, attr, contents)
 
@@ -57,30 +61,32 @@ def filler_from_config():
     )
 
 
-## FILLING ALGORITHM
+#
+# Filling algorithm
+#
 
-ZERO = datetime.timedelta(seconds=0)
-def fill(timeslots, filler, start_time, end_time):
+
+def fill(timeslots, filler, start, finish):
     """Fills any gaps in the given timeslot list with filler slots,
     such that the list is fully populated from the given start time
     to the given end time.
 
     Args:
         timeslots: The list of timeslots, may be empty.
-        start_time: the start date/time.
-        end_time: the end date/time.
+        start: The datetime at which the filled timeslot list should start.
+        finish: The datetime at which the filled timeslot list should finish.
     """
-    if start_time > end_time:
-        raise ValueError('Start time is after end time.')
+    if start > finish:
+        raise ValueError('Start time is after finish time.')
 
-    current_time = start_time
+    current_time = start
     filled = []
     unplaced = iter(timeslots)
 
-    while current_time < end_time:
+    while current_time < finish:
         timeslot = next(unplaced, None)
-        end = min(end_time, timeslot.start_time) if timeslot else end_time
-        gap = end - current_time
+        next_time = min(finish, timeslot.start) if timeslot else finish
+        gap = next_time - current_time
 
         if gap < ZERO:
             raise ValueError('Negative gap.')

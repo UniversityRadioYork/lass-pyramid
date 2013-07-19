@@ -1,3 +1,4 @@
+import functools
 import pyramid
 
 import lass.common.config
@@ -6,8 +7,6 @@ import lass.model_base
 import lass.schedule.filler
 import lass.schedule.lists
 import lass.schedule.models
-
-STATIC = 'assets:static'
 
 
 def get_page(request, current_url, website):
@@ -25,8 +24,6 @@ def get_page(request, current_url, website):
         except StopIteration:
             # Yield the default page/title above
             pass
-    else:
-        title = 'Not Found'
 
     return dict(page, title=title)
 
@@ -47,8 +44,8 @@ def standard_context(event):
             'now': lass.common.time.aware_now(),
             'date_config': lass.common.time.load_date_config(),
 
-            'current_schedule': lass.schedule.lists.Lazy(
-                lambda: lass.schedule.lists.next(10)
+            'current_schedule': lass.schedule.lists.Schedule(
+                functools.partial(lass.schedule.lists.next, count=10)
             ),
             'service_state': lass.schedule.service.State(),
             'website': website,

@@ -102,6 +102,7 @@ def load_date_config():
         'schedule_start_time': datetime.time(
             hour=raw_config['schedule_start_hour']
         ),
+        'second_year_terms': raw_config['second_year_terms']
     }
 
     # Add functions commonly used in templates into the config.

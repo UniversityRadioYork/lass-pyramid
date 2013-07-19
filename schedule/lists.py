@@ -1,104 +1,171 @@
 """Functions for selecting lists of timeslots based on certain criteria."""
 
 import datetime
+import functools
 import sqlalchemy
 
-from . import models
+import lass.schedule.models
 
 import lass.common.time
 import lass.schedule.filler
 
 
-class Lazy(object):
+def process(slots, start, finish):
+    """Processes a raw list of timeslots, annotating and filling them.
+
+    Args:
+        slots: The list of timeslots.  May be mutated.
+        start: The datetime representing the desired start of the schedule;
+            filler will pad between here and the first timeslot, if necessary.
+        finish: The datetime representing the desired end of the schedule;
+            filler will pad between the last timeslot and here, if necessary.
+
+    Returns:
+        The list 'slots', augmented with filler and metadata/credits
+        annotations.  The list may exceed the boundaries of
+        'start' and 'finish', but should be filled to meet them at least.
+    """
+    if slots:
+        lass.schedule.models.Timeslot.annotate(slots)
+        start = min(slots[0].start, start)
+        finish = max(slots[-1].finish, finish)
+
+    return lass.schedule.filler.fill(
+        slots,
+        lass.schedule.filler.filler_from_config(),
+        start,
+        finish
+    )
+
+
+class Schedule(object):
     """Lazy loader/cache for schedule lists."""
-    def __init__(self, function):
+    def __init__(
+        self,
+        creator,
+        processor=process,
+        source=None,
+        start=None,
+        finish=None
+    ):
         """Initialises the lazy loader.
 
         Args:
-            function: A zero-arguments lambda/thunk to evaluate to retrieve
-            the schedule data.  Usually should be of the form
-            "lambda: f(foo, bar, baz)".
+            creator: A function taking the start time and returning a list of
+                unfilled and unannotated timeslots.
+            processor: A processing function for post-processing the output of
+                'function' (for example, annotating and filling).  (Default:
+                'process'.)
+            source: A Query from which all timeslots should be selected.
+                May be None, in which case the query matching all public
+                timeslots will be used.
+                (Default: None.)
+            start: The datetime at which the schedule should start.
+                May be None, in which case the date/time at calling is used.
+                (Default: None.)
+            finish: The datetime at which the schedule should finish.
+                May be None, in which case the schedule finishes one day after
+                it starts.
+                (Default: None.)
 
         Returns:
-            A Lazy object.
+            A Schedule object.
         """
-        self.function = function
+        self.slots = None
+        self.source = lass.schedule.models.Timeslot.query.public()
+
+        self.start = start if start else lass.common.time.aware_now()
+        self.finish = finish if finish else (
+            self.start + datetime.timedelta(days=1)
+        )
+
+        self.creator = functools.partial(
+            creator,
+            source=self.source,
+            start=self.start,
+            finish=self.finish
+        )
+        self.processor = functools.partial(
+            processor,
+            start=self.start,
+            finish=self.finish
+        )
         self.stored = False
-        self.contents = None
 
     @property
     def timeslots(self):
-        """Retrieves the list of timeslots this Lazy object is set to retrieve.
+        """Retrieves the list of timeslots this Schedule object is set to
+        retrieve.
 
         If the timeslots have not yet been retrieved, this will invoke the
         retrieval function and then save the results for future calls on this
         object only.
 
         Returns:
-            The list of timeslots this Lazy object has been directed to compute.
+            The list of timeslots this object has been directed to compute.
         """
         if not self.stored:
-            self.contents = self.function()
+            self.slots = self.processor(self.creator())
             self.stored = True
 
-        return self.contents
+        return self.slots
 
 
-def next(count, start_at=None):
-    """Selects the next 'count' shows, including the currently playing timeslot,
-    and performs filling and annotating.
+def from_to(source, start, finish):
+    """Selects all shows between 'start' and 'finish'.
+
+    No filling is done, and shows selected may start or finish outside the
+    boundaries required; consequently the start of the first and end of the
+    last show may not equate to start and finish respectively.
 
     Args:
-        count: The maximum number of timeslots to select.
-        start_at: The datetime used as a reference point to determine which
-            shows are the 'next' ones.  (Default: now)
+        source: A query providing the timeslots from which this function should
+            select.  For all public shows, use 'Timeslot.query.public()',
+            for example.
+        start: The datetime representing the start of the schedule.
+        finish: The datetime representing the finish of the schedule.
 
     Returns:
-        A list containing up to 'count' timeslots, which may either be actual
-        timeslots or filler.  The list represents the next 'count' timeslots
-        to occur from 'start_at', with any trailing filler limited to at most
-        one day in length.
+        A raw ordered list of every show from 'source' with air-time between
+        'start' and 'finish'.
     """
-    if not start_at:
-        start_at = lass.common.time.aware_now()
-
-    raw = lass.schedule.lists.next_raw(count, start_at)
-    if raw:
-        lass.schedule.models.Timeslot.annotate(raw)
-        start = min(raw[0].start_time, start_at)
-        end = raw[-1].end_time
-    else:
-        start = start_at
-        end = start_at
-
-    return lass.schedule.filler.fill(
-        raw,
-        lass.schedule.filler.filler_from_config(),
-        start_time=start,
-        end_time=end + datetime.timedelta(hours=24)
-    )[:count]
+    return source.filter(
+        (lass.schedule.models.Timeslot.start <= finish) &
+        (
+            (
+                lass.schedule.models.Timeslot.start +
+                lass.schedule.models.Timeslot.duration
+            ) > start
+        )
+    ).order_by(
+        sqlalchemy.asc(lass.schedule.models.Timeslot.start)
+    ).all()
 
 
-def next_raw(count, start_at=None):
+def next(source, start, finish, count):
     """Selects the next 'count' shows, including the currently playing timeslot.
 
     No filling is done.
 
     Args:
+        source: A query providing the timeslots from which this function should
+            select.  For all public shows, use 'Timeslot.query.public()',
+            for example.
         count: The maximum number of timeslots to select.
-        start_at: The datetime used as a reference point to determine which
+        start: The datetime used as a reference point to determine which
             shows are the 'next' ones.  (Default: now)
+        finish: Ignored; kept for interface consistency.
+
 
     Returns:
         A list of up to 'count' raw timeslots representing the next timeslots
-        to occur from 'start_at' (or now if 'from' is None).
+        to occur from 'start' (or now if 'from' is None).
     """
-    if not start_at:
-        start_at = lass.common.time.aware_now
-
-    return models.Timeslot.query.filter(
-        ((models.Timeslot.start_time + models.Timeslot.duration) > start_at)
-        & (models.ShowType.is_public == True)
+    return source.filter(
+        (
+            lass.schedule.models.Timeslot.start +
+            lass.schedule.models.Timeslot.duration
+        ) > start
     ).order_by(
-        sqlalchemy.asc(models.Timeslot.start_time)
+        sqlalchemy.asc(lass.schedule.models.Timeslot.start)
     ).limit(count).all()
