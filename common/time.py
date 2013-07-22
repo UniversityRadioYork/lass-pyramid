@@ -50,71 +50,127 @@ def aware_now():
     return datetime.datetime.now(pytz.utc)
 
 
-def start_on(date, date_config):
-    """Returns the datetime representing the start of the schedule on a
-    particular date.
-
-    Args:
-        date: The date on which the start should be calculated.
-        date_config: The configuration for the date/time functions, as loaded
-            from 'load_date_config'.
-
-    Returns:
-        a datetime whose date is 'date' and whose time is the start of the
-        schedule day in the local timezone on that date.
+class TimeContext(object):
+    """An object representing the context in which local date/time operations
+    can occur.
     """
-    return date_config['timezone'].localize(
-        datetime.datetime.combine(
-            date,
-            date_config['schedule_start_time']
-        )
-    )
+
+    def __init__(self, timezone, second_year_terms, schedule_start_time):
+        """Initialises the TimeContext.
+
+        Args:
+            timezone: Either a string representing the Olson timezone used for
+                local time operations, or a tzinfo object representing the same.
+            second_year_terms: A list of names of terms for which the academic
+                year is one less than the calendar year.
+            schedule_start_time: Either a number representing the (local) hour
+                at which the schedule begins each day, or a naive datetime
+                representing the same.
+
+        Returns:
+            A TimeContext representing the above context.
+        """
+        if isinstance(timezone, str):
+            self.timezone = pytz.timezone(timezone)
+        else:
+            self.timezone = timezone
+
+        if isinstance(schedule_start_time, int):
+            self.schedule_start_time = datetime.time(
+                hour=schedule_start_time,
+                minute=0,
+                second=0
+            )
+        else:
+            self.schedule_start_time = schedule_start_time
+
+        self.second_year_terms = second_year_terms
+        self.midnight = datetime.time(hour=0, minute=0, second=0)
+        self.one_day = datetime.timedelta(days=1)
+
+    def localise(self, dt):
+        """Converts an aware datetime to local (aware) time.
+
+        Args:
+            dt: The datetime to convert to a local datetime.
+
+        Returns:
+            The datetime 'dt' in the appropriate timezone for website local time.
+        """
+        return dt.astimezone(self.timezone)
+
+    def combine_as_local(self, date, time):
+        """Combines a naive date and time and interprets as an aware datetime.
+
+        This is useful for saying "give me the datetime on DATE at whatever
+        TIME means in the timezone for that date."
+
+        Args:
+            date: The date concerned.
+            time: The naive time, to be interpreted in whichever local timezone
+                is in effect on 'date'.  This can be ambiguous in the face of an
+                imminent timezone change; use with caution.
+        Returns:
+            The date time representing 'time' local time on 'date'.
+        """
+        return self.timezone.localize(datetime.datetime.combine(date, time))
+
+    def start_on(self, date):
+        """Returns the datetime representing the start of the schedule on a
+        particular date.
+
+        Args:
+            date: The date on which the start should be calculated.
+
+        Returns:
+            a datetime whose date is 'date' and whose time is the start of the
+            schedule day in the local timezone on that date.
+        """
+        return self.combine_as_local(date, self.schedule_start_time)
+
+    def local_midnight_on(self, date):
+        """Returns the datetime representing the local midnight
+        particular date.
+
+        Args:
+            date: The date on which the midnight should be calculated.
+
+        Returns:
+            A datetime whose date is 'date' and whose time is midnight in the
+            local timezone on that date.
+        """
+        return self.combine_as_local(date, self.midnight)
+
+    def schedule_date_of(self, datetime):
+        """Return the date on which an aware datetime falls in the schedule.
+
+        Because the schedule need not start at midnight, the actual date and
+        schedule date may differ by up to one day.
+
+        Args:
+            datetime: The aware datetime (timezone need not matter) whose
+                corresponding schedule date is sought.
+
+        Returns:
+            A date (not a datetime) representing the schedule day on which the
+            datetime lands.
+        """
+        local = self.localise(datetime)
+
+        date = local.date()
+
+        # Get the start of programming on the same local-time calendar day as
+        # the input datetime.  We need this because the input datetime might be
+        # before this time (and thus in the *day before*'s schedule)!
+        day_start = self.start_on(date)
+
+        # Correct for the above observation
+        return date if local >= day_start else (date - self.one_day)
 
 
-def local_midnight_on(date, date_config):
-    """Returns the datetime representing the local midnight
-    particular date.
-
-    Args:
-        date: The date on which the midnight should be calculated.
-        date_config: The configuration for the date/time functions, as loaded
-            from 'load_date_config'.
-
-    Returns:
-        a datetime whose date is 'date' and whose time is midnight in the local
-        timezone on that date.
-    """
-    return date_config['timezone'].localize(
-        datetime.datetime.combine(
-            date,
-            datetime.time(hour=0, minute=0, second=0)
-        )
-    )
-
-
-def load_date_config():
-    """Loads and pre-processes the website date configuration file."""
-    raw_config = lass.common.config.from_yaml('sitewide/time')
-
-    timezone = pytz.timezone(raw_config['timezone'])
-
-    config = {
-        'timezone': timezone,
-        'schedule_start_time': datetime.time(
-            hour=raw_config['schedule_start_hour']
-        ),
-        'second_year_terms': raw_config['second_year_terms']
-    }
-
-    # Add functions commonly used in templates into the config.
-    configure = functools.partial(functools.partial, date_config=config)
-    config.update(
-        {
-            'local_midnight_on': configure(local_midnight_on),
-            'start_on': configure(start_on)
-        }
-    )
-    return config
+def context_from_config():
+    """Creates a TimeContext from the time configuration file."""
+    return TimeContext(**(lass.common.config.from_yaml('sitewide/time')))
 
 
 #

@@ -180,17 +180,14 @@ def year_month_day(request):
 
 def day(request, start_date):
     """Common body for all day schedule views."""
-    conf = lass.common.time.load_date_config()
+    time = lass.common.time.context_from_config()
     duration = datetime.timedelta(days=1)
 
     # Make sure we start and finish at the start of programming, which
     # is a local time - this may mean some days are longer or shorter than
     # 24 hours due to DST.
-    start = lass.common.time.start_on(start_date, conf)
-    finish = lass.common.time.start_on(
-        start_date + datetime.timedelta(days=1),
-        conf
-    )
+    start = time.start_on(start_date)
+    finish = time.start_on(start_date + datetime.timedelta(days=1))
     duration = finish - start
 
     return {

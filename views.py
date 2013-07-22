@@ -42,7 +42,7 @@ def standard_context(event):
     event.update(
         {
             'now': lass.common.time.aware_now(),
-            'date_config': lass.common.time.load_date_config(),
+            'date_config': lass.common.time.context_from_config(),
 
             'current_schedule': lass.schedule.lists.Schedule(
                 functools.partial(lass.schedule.lists.next, count=10)

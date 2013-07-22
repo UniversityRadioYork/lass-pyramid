@@ -417,6 +417,7 @@ class Timeslot(
                         show_timeslot.text[key] += value
                     else:
                         show_timeslot.text[key] = value
+        lass.schedule.blocks.annotate(timeslots)
 
 
 class Message(lass.model_base.Base):

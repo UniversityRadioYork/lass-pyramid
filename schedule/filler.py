@@ -43,10 +43,12 @@ class FillerTimeslot(lass.schedule.models.BaseTimeslot):
     Filler timeslots are mostly compatible with regular timeslots, but have
     pre-applied "fake" metadata, and have no attached seasons or shows.
     """
-    def __init__(self, start, duration, metadata=None):
+    def __init__(self, start, duration, metadata={}, block=None):
         super().__init__(start, duration)
         for attr, contents in metadata.items():
             setattr(self, attr, contents)
+
+        self.block = block
 
 
 def filler_from_config():
@@ -57,7 +59,8 @@ def filler_from_config():
     filler_config = lass.common.config.from_yaml('sitewide/filler')
     return functools.partial(
         FillerTimeslot,
-        metadata=filler_config['metadata']
+        metadata=filler_config['metadata'],
+        block=filler_config['block']
     )
 
 
