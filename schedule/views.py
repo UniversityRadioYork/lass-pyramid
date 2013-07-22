@@ -126,8 +126,9 @@ def schedule(request):
 
     Currently this redirects to this week's schedule.
     """
-
-    raise pyramid.exceptions.NotFound('TODO: implement this')
+    raise pyramid.httpexceptions.HTTPFound(
+        location=request.route_url('schedule-thisweek')
+    )
 
 
 #
@@ -204,6 +205,25 @@ def year_month_day(request):
 #
 # WEEK SCHEDULES
 #
+
+@pyramid.view.view_config(
+    route_name='schedule-thisweek',
+    renderer='schedule/week.jinja2'
+)
+def thisweek(request):
+    """Shows the schedule for the current week (relative to local time)."""
+    time_context = lass.common.time.context_from_config()
+    # We want the date of Monday on this week, which can conveniently be
+    # reached by subtracting the weekday (monday=0, ..., sunday=6) from today's
+    # date.
+    today_date = time_context.schedule_date_of(time_context.local_now())
+    monday_date = today_date - datetime.timedelta(days=today_date.weekday())
+    return week(
+        request,
+        start_date=monday_date,
+        time_context=time_context
+    )
+
 
 @pyramid.view.view_config(
     route_name='schedule-year-week',
