@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import datetime
+import fnmatch
 import itertools
 
 import lass.common.config
@@ -52,40 +53,60 @@ def annotate(timeslots):
     conf = block_config()
     time_context = lass.common.time.context_from_config()
 
-    blocks = block_iter(conf['range_blocks'], conf['blocks'])
+    range_blocks = range_iter(conf['range_blocks'])
 
-    current_block = None
-    next_block_start, next_block = next(blocks)
+    range_block = None
+    next_range_block_start, next_range_block = next(range_blocks)
 
     for timeslot in timeslots:
-        while next_block_start is not None and (
+        # Range-based blocks
+        while next_range_block_start is not None and (
             time_context.combine_as_local(
                 timeslot.start.date(),
-                next_block_start
+                next_range_block_start
             ) <= timeslot.start
         ):
-            current_block = next_block
-            next_block_start, next_block = next(blocks)
+            range_block = next_range_block
+            next_range_block_start, next_range_block = next(range_blocks)
 
-        if not hasattr(timeslot, 'block'):
-            timeslot.block = current_block
+        # Name-based blocks
+        name_block = None
+        for pattern, block in conf['name_blocks']:
+            if (
+                hasattr(timeslot, 'text') and
+                'title' in timeslot.text and
+                fnmatch.fnmatch(
+                    timeslot.text['title'][0].lower(),
+                    pattern.lower()
+                )
+            ):
+                name_block = block
+                # Don't match against any other pattern; this allows exclusion
+                # patterns to exist.
+                break
+
+        # Name blocks take precedence if available.
+        block_name = name_block if name_block is not None else range_block
+        timeslot.block = (
+            None
+            if block_name is None
+            else dict(conf['blocks'][block_name], name=block_name)
+        )
 
 
-def block_iter(blocks, definitions):
+def range_iter(blocks):
     """Produces an iterator that returns blocks from the given range-block
     list.
 
-    The iterator will produce 2-tuples of the form (active time, name) where
-    either element may be None (signifying no forthcoming block in the former
-    case and no active range-block in the latter).
+    The iterator will produce 2-tuples of the form (active time, block name)
+    where either element may be None (signifying no forthcoming block in the
+    former case and no active range-block in the latter).
 
     Args:
         blocks: An iterable consisting of 3-tuples (or equivalents) of the form
             (hour, minute, name), in ascending chronological order from midnight
             and with hour and minute representing a local time at which the
             block referred to by 'name' is to be active.
-        time_context: A TimeContext providing the local time interpretation
-            used to map the hours and minutes into aware local times.
 
     Returns:
         An infinte iterable that will provide the above tuples.
@@ -94,7 +115,7 @@ def block_iter(blocks, definitions):
         (
             (
                 datetime.time(hour=int(h), minute=int(m), second=0),
-                dict(definitions[name], name=name) if name else None
+                name
             ) for (h, m, name) in blocks
         ),
         itertools.repeat((None, None))
