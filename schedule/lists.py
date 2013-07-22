@@ -2,6 +2,7 @@
 
 import datetime
 import functools
+import itertools
 import sqlalchemy
 
 import lass.schedule.models
@@ -72,7 +73,7 @@ class Schedule(object):
             A Schedule object.
         """
         self.slots = None
-        self.source = lass.schedule.models.Timeslot.query.public()
+        self.source = lass.schedule.models.Timeslot.public()
 
         self.start = start if start else lass.common.time.aware_now()
         self.finish = finish if finish else (
@@ -91,6 +92,7 @@ class Schedule(object):
             finish=self.finish
         )
         self.stored = False
+        self.time_context = lass.common.time.context_from_config()
 
     @property
     def timeslots(self):
@@ -109,6 +111,39 @@ class Schedule(object):
             self.stored = True
 
         return self.slots
+
+    def days(self):
+        """Returns the dates of all days covered by this schedule.
+
+        Returns:
+            An iterable of dates corresponding to each day in this schedule, in
+            chronological order.
+        """
+        start_date = self.time_context.localise(self.start).date()
+        finish_date = self.time_context.localise(self.finish).date()
+
+        return itertools.takewhile(
+            (lambda i: i < finish_date),
+            map(
+                lambda c: start_date + datetime.timedelta(days=c),
+                itertools.count()
+            )
+        )
+
+    def table(self):
+        """Attempts to convert the schedule into table form.
+
+        This will likely not work for non-weekly schedules.
+
+        Returns:
+            The schedule, in tabular form (lists of time rows containing day
+            columns).
+        """
+        return lass.schedule.table.tabulate(
+            self.start,
+            self.timeslots,
+            self.time_context
+        )
 
 
 def from_to(source, start, finish):

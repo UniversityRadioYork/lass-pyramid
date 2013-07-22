@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import datetime
-import functools
 
 import pytz
 
@@ -88,6 +87,15 @@ class TimeContext(object):
         self.midnight = datetime.time(hour=0, minute=0, second=0)
         self.one_day = datetime.timedelta(days=1)
 
+    def local_now(self):
+        """Returns the current datetime in local (aware) time.
+
+        Returns:
+            An aware datetime representing now in this TimeContext's local
+            timezone.
+        """
+        return self.localise(aware_now())
+
     def localise(self, dt):
         """Converts an aware datetime to local (aware) time.
 
@@ -98,6 +106,22 @@ class TimeContext(object):
             The datetime 'dt' in the appropriate timezone for website local time.
         """
         return dt.astimezone(self.timezone)
+
+    def shift_local(self, datetime, delta):
+        """Moves a local datetime by a timedelta, taking into account DST.
+
+        Args:
+            datetime: An aware, local datetime.
+            delta: A timedelta by which the datetime should be shifted.
+
+        Returns:
+            The result of moving datetime by 'delta' amount of local time.  When
+            applying over timezone boundaries, the effect of DST will be
+            compensated for (for example, midnight BST + 4 hours = 4am GMT).
+        """
+        naive = datetime.replace(tzinfo=None)
+        new_naive = naive + delta
+        return self.timezone.localize(new_naive)
 
     def combine_as_local(self, date, time):
         """Combines a naive date and time and interprets as an aware datetime.

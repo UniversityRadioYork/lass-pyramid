@@ -1,4 +1,5 @@
 import datetime
+import functools
 import pyramid
 import sqlalchemy
 
@@ -36,12 +37,13 @@ def show_detail(request):
 
     # Make sure the ID corresponds to a show that has a ShowDB entry.
     show_id = request.matchdict['showid']
-    show = lass.schedule.models.Show.query.in_showdb().join(
-        lass.schedule.models.Show.seasons
-    ).filter(
+    show = lass.schedule.models.Show.query.in_showdb().filter(
         lass.schedule.models.Show.id == show_id
     ).options(
-        sqlalchemy.orm.contains_eager(lass.schedule.models.Show.seasons)
+        sqlalchemy.orm.joinedload(
+            lass.schedule.models.Show.seasons,
+            lass.schedule.models.Season.timeslots
+        )
     ).first()
     if not show:
         raise pyramid.exceptions.NotFound(
@@ -128,6 +130,25 @@ def schedule(request):
     raise pyramid.exceptions.NotFound('TODO: implement this')
 
 
+#
+# DAY SCHEDULES
+#
+
+
+@pyramid.view.view_config(
+    route_name='schedule-today',
+    renderer='schedule/day.jinja2'
+)
+def today(request):
+    """Shows the schedule for the current day (relative to local time)."""
+    time_context = lass.common.time.context_from_config()
+    return day(
+        request,
+        start_date=time_context.schedule_date_of(time_context.local_now()),
+        time_context=time_context
+    )
+
+
 @pyramid.view.view_config(
     route_name='schedule-year-week-day',
     renderer='schedule/day.jinja2'
@@ -150,7 +171,8 @@ def year_week_day(request):
             )
         )
 
-    return day(request, start_date)
+    time_context = lass.common.time.context_from_config()
+    return day(request, start_date, time_context=time_context)
 
 
 @pyramid.view.view_config(
@@ -175,31 +197,65 @@ def year_month_day(request):
             )
         )
 
-    return day(request, start_date)
+    time_context = lass.common.time.context_from_config()
+    return day(request, start_date, time_context=time_context)
 
 
-def day(request, start_date):
-    """Common body for all day schedule views."""
-    time = lass.common.time.context_from_config()
-    duration = datetime.timedelta(days=1)
+#
+# WEEK SCHEDULES
+#
+
+@pyramid.view.view_config(
+    route_name='schedule-year-week',
+    renderer='schedule/week.jinja2'
+)
+def year_week(request):
+    """Shows the schedule for a specific week given in ISO Y/W format."""
+    # Try to convert the incoming date information to Python representation
+    try:
+        start_date = lass.common.time.iso_to_gregorian(
+            iso_day=1,
+            **{
+                'iso_' + k: int(v)
+                for k, v in request.matchdict.items()
+                if k in ('year', 'week')
+            }
+        )
+    except ValueError:
+        raise pyramid.exceptions.NotFound(
+            'Invalid date: {year}-W{week}'.format_map(
+                request.matchdict
+            )
+        )
+
+    time_context = lass.common.time.context_from_config()
+    return week(request, start_date, time_context=time_context)
+
+
+def schedule_view(request, start_date, duration, time_context):
+    """Common body for all full-schedule views."""
 
     # Make sure we start and finish at the start of programming, which
     # is a local time - this may mean some days are longer or shorter than
-    # 24 hours due to DST.
-    start = time.start_on(start_date)
-    finish = time.start_on(start_date + datetime.timedelta(days=1))
-    duration = finish - start
+    # 24 hours due to DST, etc.
+    start = time_context.start_on(start_date)
+    finish = time_context.start_on(start_date + duration)
+    true_duration = finish - start
 
     return {
         'start': start,
         'finish': finish,
-        'duration': duration,
-        'day_schedule': lass.schedule.lists.Schedule(
+        'duration': true_duration,
+        'schedule': lass.schedule.lists.Schedule(
             creator=lass.schedule.lists.from_to,
             start=start,
             finish=finish
         )
     }
+
+
+day = functools.partial(schedule_view, duration=datetime.timedelta(days=1))
+week = functools.partial(schedule_view, duration=datetime.timedelta(weeks=1))
 
 
 @pyramid.view.view_config(

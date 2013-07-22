@@ -162,12 +162,12 @@ class Show(
     seasons = sqlalchemy.orm.relationship(
         'Season',
         backref=sqlalchemy.orm.backref('show', lazy='joined'),
-        order_by='Season.term_id'
+        order_by='Season.id'
     )
 
     @classmethod
     def public(cls):
-        """Retrieves a Query of all public shows."""
+        """retrieves a query of all public shows."""
         return cls.query.join(
             'type'
         ).options(
@@ -320,6 +320,17 @@ class Timeslot(
         backref='timeslot'
     )
 
+    is_filler = False
+
+    @property
+    def is_collapsible(self):
+        """Returns whether this timeslot can be collapsed down in a schedule,
+
+        What this means is if multiple consecutive rows on a timetable belong to
+        collapsible timeslots, the rows can be merged into one row.
+        """
+        return self.season.show.type.is_collapsible
+
     @property
     def tracklist(self):
         """Returns a list of tracks played during this timeslot.
@@ -370,6 +381,21 @@ class Timeslot(
     def can_be_messaged(self):
         """Returns whether this timeslot can receive messages."""
         return self.season.show.type.can_be_messaged
+
+    @classmethod
+    def public(cls):
+        """retrieves a query of all public shows."""
+        return cls.query.join(
+            'season',
+            'show',
+            'type'
+        ).options(
+            sqlalchemy.orm.contains_eager(
+                'season',
+                'show',
+                'type'
+            )
+        ).filter(ShowType.is_public)
 
     @classmethod
     def meta_sources(cls):

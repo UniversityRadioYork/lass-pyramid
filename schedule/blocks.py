@@ -53,54 +53,57 @@ def annotate(timeslots):
     conf = block_config()
     time_context = lass.common.time.context_from_config()
 
-    range_blocks = range_iter(conf['range_blocks'])
-
-    range_block = None
-    next_range_block_start, next_range_block = next(range_blocks)
-
-    for timeslot in timeslots:
-        # Range-based blocks
-        while next_range_block_start is not None and (
-            time_context.combine_as_local(
-                timeslot.start.date(),
-                next_range_block_start
-            ) <= timeslot.start
-        ):
-            range_block = next_range_block
-            next_range_block_start, next_range_block = next(range_blocks)
-
-        # Name-based blocks
-        name_block = None
-        for pattern, block in conf['name_blocks']:
-            if (
-                hasattr(timeslot, 'text') and
-                'title' in timeslot.text and
-                fnmatch.fnmatch(
-                    timeslot.text['title'][0].lower(),
-                    pattern.lower()
-                )
-            ):
-                name_block = block
-                # Don't match against any other pattern; this allows exclusion
-                # patterns to exist.
-                break
-
-        # Name blocks take precedence if available.
-        block_name = name_block if name_block is not None else range_block
-        timeslot.block = (
-            None
-            if block_name is None
-            else dict(conf['blocks'][block_name], name=block_name)
+    if timeslots:
+        start_date = time_context.schedule_date_of(timeslots[0].start)
+        range_blocks = range_iter(
+            conf['range_blocks'],
+            start_date,
+            time_context
         )
 
+        range_block = None
+        next_range_block_start, next_range_block = next(range_blocks)
 
-def range_iter(blocks):
+        for timeslot in timeslots:
+            # Range-based blocks
+            while next_range_block_start <= timeslot.start:
+                range_block = next_range_block
+                next_range_block_start, next_range_block = next(range_blocks)
+
+            # Name-based blocks
+            name_block = None
+            for pattern, block in conf['name_blocks']:
+                if (
+                    hasattr(timeslot, 'text') and
+                    'title' in timeslot.text and
+                    fnmatch.fnmatch(
+                        timeslot.text['title'][0].lower(),
+                        pattern.lower()
+                    )
+                ):
+                    name_block = block
+                    # Don't match against any other pattern; this allows
+                    # exclusion patterns to exist.
+                    break
+
+            # Name blocks take precedence if available.
+            block_name = name_block if name_block is not None else range_block
+            timeslot.block = (
+                None
+                if block_name is None
+                else dict(conf['blocks'][block_name], name=block_name)
+            )
+
+
+def range_iter(blocks, start_date, time_context):
     """Produces an iterator that returns blocks from the given range-block
     list.
 
-    The iterator will produce 2-tuples of the form (active time, block name)
-    where either element may be None (signifying no forthcoming block in the
-    former case and no active range-block in the latter).
+    The iterator will produce 2-tuples of the form (active datetime, block name)
+    where the latter may be None (signifying the absence of active range-block).
+    The former starts at the first block on start_date and continues forwards
+    on each block change point, the date advancing by one day each time the
+    block list is exhausted and restarted.
 
     Args:
         blocks: An iterable consisting of 3-tuples (or equivalents) of the form
@@ -109,17 +112,20 @@ def range_iter(blocks):
             block referred to by 'name' is to be active.
 
     Returns:
-        An infinte iterable that will provide the above tuples.
+        An "infinite" iterable (actually bounded by the maximum allowed date!)
+        that will provide the above tuples.
     """
-    return itertools.chain(
-        (
+    date = start_date
+    while True:
+        yield from (
             (
-                datetime.time(hour=int(h), minute=int(m), second=0),
-                name
+                time_context.combine_as_local(
+                    date,
+                    datetime.time(hour=int(h), minute=int(m), second=0)
+                ), name
             ) for (h, m, name) in blocks
-        ),
-        itertools.repeat((None, None))
-    )
+        )
+        date += datetime.timedelta(days=1)
 
 
 def block_config():
