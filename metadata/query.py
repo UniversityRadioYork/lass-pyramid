@@ -2,69 +2,95 @@
 
 import functools
 import hashlib
+import sqlalchemy
 
 import lass.common.rdbms
-
-from . import rdbms
-
-
-# Source helpers
-def make_rdbms_source(source_func, with_default=True):
-    """Creates a RDBMS-based metadata source."""
-    def source(subjects, meta_type, priority):
-        subject_keys = [subject.id for subject in subjects]
-        return source_func(
-            subject_table=lass.common.rdbms.table(subjects[0]),
-            meta_type=meta_type,
-            priority=priority,
-            subject_keys=subject_keys + ([None] if with_default else [])
-        )
-    return source
+import lass.metadata.models
 
 
-own = functools.partial(make_rdbms_source, source_func=rdbms.direct_table)
-package = functools.partial(make_rdbms_source, source_func=rdbms.package)
+def get_attachment(model, attachment_type, meta_type):
+    if not hasattr(model, attachment_type):
+        setattr(model, attachment_type, {})
+    attachment = getattr(model, attachment_type)
+
+    if meta_type.name not in attachment:
+        attachment[meta_type.name] = meta_type.attach(model)
 
 
-def cache_key(subject, meta_type, key, date):
-    """
-    Returns a representation of the query that can be used as a
-    cache key.
+def own(subjects, meta_type, priority):
+    """Queries for all metadata attached to a given set of subjects, for a
+    given type of metadata.""" 
 
-    Returns:
-        a string that represents the query in a way that is sufficiently unique
-        for caching purposes.
-    """
-    # This used to be a human-readable string, but given memcached's
-    # rather stringent key requirements it's easier to just bung all
-    # the information that makes queries unique (and only that information)
-    # in a hash.
-    h = hashlib.md5()
-    components = [
-        subject.__class__,
-        subject.id,
-        meta_type,
-        key,
-        date,
-    ]
-    for c in components:
-        h.update(repr(c).encode())
-    return h.hexdigest()
+    meta = sqlalchemy.inspection.inspect(
+        getattr(subjects[0].__class__, meta_type + '_entries')
+    ).mapper.class_
+
+    return lass.model_base.DBSession.query(
+        lass.metadata.models.Key.name.label('key'),
+        meta.value.label('value'),
+        meta.effective_from.label('effective_from'),
+        meta.effective_to.label('effective_to'),
+        meta.subject_id.label('subject_id'),
+        sqlalchemy.literal(priority).label('priority')
+    ).select_from(
+        meta
+    ).join(
+        lass.metadata.models.Key
+    ).filter(
+        meta.subject_id.in_([subject.id for subject in subjects])
+    )
 
 
-def run(subjects, meta_type, date, sources, *keys, describe=False):
+def package(subjects, meta_type, priority):
+    """Queries for all metadata attached to a given set of subjects, for a
+    given type of metadata and indirected through the metadata package layer."""
+
+    pkg_model = sqlalchemy.inspection.inspect(
+        subjects[0].__class__.package_entries
+    ).mapper.class_
+    meta = sqlalchemy.inspection.inspect(
+        getattr(subjects[0].__class__, meta_type + '_entries')
+    ).mapper.class_
+
+    return lass.model_base.DBSession.query(
+        lass.metadata.models.Key.name.label('key'),
+        meta.value.label('value'),
+        meta.effective_from.label('effective_from'),
+        meta.effective_to.label('effective_to'),
+        meta.subject_id.label('subject_id'),
+        sqlalchemy.literal(priority).label('priority')
+    ).select_from(
+        meta
+    ).join(
+        pkg_model.package,
+        lass.metadata.models.Key
+    ).filter(
+        pkg_model.subject_id.in_([subject.id for subject in subjects])
+    )
+
+
+def run(subjects, meta_type, date, sources, *keys):
     # Metadata is currently held in a relational database.
     # It would be spiffing to change this
-    return rdbms.metadata_from_sources(
-        [
-            source(
-                meta_type=meta_type,
-                priority=priority,
-                subjects=subjects
-            )
-            for priority, source in enumerate(sources)
-        ],
-        date,
-        *keys,
-        describe=describe
+    first, *rest = (
+        source(subjects, meta_type, priority)
+        for priority, source in enumerate(sources)
+    )
+
+    union = first.union(*rest).subquery()
+
+    return lass.common.rdbms.bulk_group(
+        lass.model_base.DBSession.query(
+            union.c.subject_id,
+            union.c.key,
+            union.c.value
+        ).filter(
+            (union.c.key.in_(keys)) &
+            (lass.common.rdbms.transient_active_on(date, union))
+        ).order_by(
+            sqlalchemy.asc(union.c.subject_id),
+            sqlalchemy.asc(union.c.key),
+            sqlalchemy.asc(union.c.priority),
+            sqlalchemy.desc(union.c.effective_from)
+        )
     )

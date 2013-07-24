@@ -27,8 +27,58 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import math
-
 import pyramid
+import sqlalchemy
+
+import lass.model_base
+import lass.metadata.models
+
+
+def search(request, model, detail_route):
+    """Implements a metadata search view for the given model.
+
+    This view skeleton understands the following GET parameters:
+        term: The search term to be used in the search.
+        key: The name of a metadata key through which the search will occur.
+            Multiple 'key's can be requested.
+        search_type: Either 'All Results', which will yield a search results
+            page, or 'First Result', which will go straight to the first result
+            when one exists (similarly to Google(tm)'s I'm Feeling Lucky(tm)).
+        page: See 'media_list'.
+
+    Args:
+        request: The request sent to the view calling this function.
+        model: The model through whose metadata this search is searching.
+        detail_route: The name of a route, taking a primary key belonging to an
+            object in 'model', using which "more details" links may be
+            constructed for the search results.
+
+    Returns:
+        A dictionary ready to be sent through 'view_config' that represents the
+        view context for the search page renderer.
+    """
+    # Treat an empty term as a lack of term, and vice versa.
+    term = request.params.get('term', '')
+    results = []
+
+    if term:
+        pass
+
+    # Get the list of searchable keys for the search form.
+    metadata_keys = (
+        lass.model_base.DBSession.query(lass.metadata.models.Key).filter(
+            lass.metadata.models.Key.searchable == True
+        ).order_by(
+            sqlalchemy.asc(lass.metadata.models.Key.plural)
+        ).all()
+    )
+
+    return {
+        'term': term,
+        'results': results,
+        'metadata_keys': metadata_keys
+    }
+
 
 def media_list(request, all_items):
     """Implements a generic list view function.
@@ -95,7 +145,14 @@ def detail(request, id_name, source, target_name='item'):
     Returns:
         A dict suitable for returning from a rendered detail view.
     """
-    item_id = request.matchdict[id_name]
+    item_id_str = request.matchdict[id_name]
+    try:
+        item_id = int(item_id_str)
+    except ValueError:
+        raise pyramid.exceptions.NotFound(
+            'Invalid ID: {}.'.format(item_id_str)
+        )
+
     item = source.get(item_id)
     if not item:
         raise pyramid.exceptions.NotFound(

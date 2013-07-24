@@ -15,9 +15,12 @@ def shows(request):
     """Displays a list of shows."""
     return lass.common.view_helpers.media_list(
         request,
-        lass.schedule.models.Show.public(
-        ).in_showdb(
-        ).scheduled(
+        lass.schedule.models.Show.in_showdb(
+        ).filter(
+            # Only show scheduled shows.
+            lass.schedule.models.Show.seasons.any(
+                lass.schedule.models.Season.timeslots.any()
+            )
         ).order_by(
             sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
         )
@@ -276,6 +279,7 @@ def schedule_view(request, start_date, duration, time_context):
 
 day = functools.partial(schedule_view, duration=datetime.timedelta(days=1))
 week = functools.partial(schedule_view, duration=datetime.timedelta(weeks=1))
+
 
 
 @pyramid.view.view_config(

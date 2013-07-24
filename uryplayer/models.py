@@ -75,3 +75,54 @@ class Podcast(
         cls.add_meta(podcasts, 'text', 'title', 'description', 'tags')
         cls.add_meta(podcasts, 'image', 'thumbnail_image', 'player_image')
         cls.add_credits(podcasts, with_byline_attr='byline')
+
+
+class PodcastText(lass.metadata.models.Text):
+    __tablename__ = 'podcast_metadata'
+    __table_args__ = {'schema': 'uryplayer'}
+    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
+    id = sqlalchemy.Column(
+        'podcast_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(
+        'podcast_id',
+        sqlalchemy.ForeignKey(Podcast.id)
+    )
+    subject = sqlalchemy.orm.relationship(Podcast, backref='text_entries')
+
+
+class PodcastImage(lass.metadata.models.Image):
+    __tablename__ = 'podcast_image_metadata'
+    __table_args__ = {'schema': 'uryplayer'}
+    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
+    id = sqlalchemy.Column(
+        'podcast_image_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(
+        'podcast_id',
+        sqlalchemy.ForeignKey(Podcast.id)
+    )
+    subject = sqlalchemy.orm.relationship(Podcast, backref='image_entries')
+
+
+class PodcastPackageEntry(lass.metadata.models.PackageEntry):
+    __tablename__ = 'podcast_package_entry'
+    __table_args__ = {'schema': 'uryplayer'}
+    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
+    id = sqlalchemy.Column(
+        'podcast_image_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(
+        'podcast_id',
+        sqlalchemy.ForeignKey(Podcast.id)
+    )
+    subject = sqlalchemy.orm.relationship(Podcast, backref='package_entries')

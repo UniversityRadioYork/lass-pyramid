@@ -31,6 +31,8 @@ import pyramid
 import sqlalchemy
 
 import lass.common.view_helpers
+import lass.metadata.models
+import lass.model_base
 import lass.uryplayer.models
 
 
@@ -60,6 +62,7 @@ def podcasts(request):
         )
     )
 
+
 @pyramid.view.view_config(
     route_name='uryplayer-podcast-detail',
     renderer='uryplayer/podcast_detail.jinja2'
@@ -75,3 +78,15 @@ def podcast_detail(request):
     )
 
 
+@pyramid.view.view_config(
+    route_name='uryplayer-podcast-search',
+    renderer='uryplayer/podcast-search.jinja2'
+)
+def search(request):
+    """Performs a search if a query is given, or allows the user to do so."""
+
+    return lass.common.view_helpers.search(
+        request,
+        lass.uryplayer.models.Podcast,
+        'uryplayer-podcast-detail' 
+    )

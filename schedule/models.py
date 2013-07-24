@@ -43,47 +43,6 @@ import lass.model_base
 import lass.people.mixins
 
 
-class ShowQuery(sqlalchemy.orm.Query):
-    """Extended version of Query with methods for easy querying of Shows.
-    """
-    def in_showdb(self):
-        """Filters this Query down to shows whose type allows them to have
-        ShowDB entries.
-
-        Returns:
-            This query, filtered to show only shows with ShowDB entries, as
-            defined by their ShowType.
-        """
-        return self.filter(ShowType.has_showdb_entry)
-
-    def public(self):
-        """Filters this Query down to public shows only.
-
-        Returns:
-            This query, filtered to show only public shows as defined by their
-            ShowType.
-        """
-        return self.filter(ShowType.is_public)
-
-    def private(self):
-        """Filters this Query down to private shows only.
-
-        Returns:
-            This query, filtered to exclude public shows as defined by their
-            ShowType.
-        """
-        return self.exclude(ShowType.is_public)
-
-    def scheduled(self):
-        """Filters this Query down to shows that have scheduled slots.
-
-        Returns:
-            This query, filtered to show only shows (public or otherwise) that
-            have scheduled timeslots.
-        """
-        return self.filter(Show.seasons.any(Season.timeslots.any()))
-
-
 class ScheduleModel(lass.model_base.Base):
     """Base for all schedule models."""
     __abstract__ = True
@@ -138,7 +97,6 @@ class Show(
     ScheduleModel
 ):
     __tablename__ = 'show'
-    query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
     id = sqlalchemy.Column(
         'show_id',
@@ -168,7 +126,9 @@ class Show(
     @classmethod
     def public(cls):
         """retrieves a query of all public shows."""
-        return cls.query.join(
+        return lass.model_base.DBSession.query(
+            cls
+        ).join(
             'type'
         ).options(
             sqlalchemy.orm.contains_eager('type')
@@ -177,16 +137,12 @@ class Show(
     @classmethod
     def in_showdb(cls):
         """Retrieves a Query of all shows in the Show Database."""
-        return cls.query.join(
-            'type'
-        ).options(
-            sqlalchemy.orm.contains_eager(cls.type)
-        ).filter(ShowType.is_public & ShowType.in_showdb)
+        return cls.public().filter(ShowType.has_showdb_entry)
 
     @classmethod
     def meta_sources(cls):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
-        return [lass.metadata.query.own(with_default=True)]
+        return [lass.metadata.query.own]
 
     @classmethod
     def annotate(cls, shows):
@@ -196,9 +152,45 @@ class Show(
         Args:
             shows: A list of shows to annotate in-place.
         """
-        cls.add_meta(shows, 'text', 'title', 'description', 'tags')
-        cls.add_meta(shows, 'image', 'thumbnail_image', 'player_image')
+        cls.add_meta(
+            shows,
+            'text',
+            'title', 'description', 'tags'
+        )
+        cls.add_meta(
+            shows,
+            'image',
+            'image', 'thumbnail_image', 'player_image'
+        )
         cls.add_credits(shows, with_byline_attr='byline')
+
+
+class ShowText(lass.metadata.models.Text):
+    __tablename__ = 'show_text_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
+    subject = sqlalchemy.orm.relationship(Show, backref='text_entries')
+
+
+class ShowImage(lass.metadata.models.Image):
+    __tablename__ = 'show_image_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_image_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
+    subject = sqlalchemy.orm.relationship(Show, backref='image_entries')
 
 
 class Term(lass.Base):
@@ -253,7 +245,6 @@ class Season(
     Seasons map onto terms of scheduled timeslots for a show.
     """
     __tablename__ = 'show_season'
-    query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
     id = lass.common.rdbms.infer_primary_key(__tablename__)
 
@@ -271,7 +262,35 @@ class Season(
     @classmethod
     def meta_sources(cls, meta_type):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
-        return [lass.metadata.query.own(with_default=True)]
+        return [lass.metadata.query.own]
+
+
+class SeasonText(lass.metadata.models.Text):
+    __tablename__ = 'show_season_text_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
+    id = sqlalchemy.Column(
+        'season_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Season.id))
+    subject = sqlalchemy.orm.relationship(Season, backref='text_entries')
+
+
+class SeasonImage(lass.metadata.models.Image):
+    __tablename__ = 'show_season_image_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
+    id = sqlalchemy.Column(
+        'season_image_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Season.id))
+    subject = sqlalchemy.orm.relationship(Season, backref='image_entries')
 
 
 class BaseTimeslot(object):
@@ -302,7 +321,6 @@ class Timeslot(
 ):
     """A schedule timeslot."""
     __tablename__ = 'show_season_timeslot'
-    query = lass.model_base.DBSession.query_property(query_cls=ShowQuery)
 
     id = lass.common.rdbms.infer_primary_key(__tablename__)
 
@@ -384,8 +402,10 @@ class Timeslot(
 
     @classmethod
     def public(cls):
-        """retrieves a query of all public shows."""
-        return cls.query.join(
+        """retrieves a query of all public timeslots."""
+        return lass.model_base.DBSession.query(
+            cls
+        ).join(
             'season',
             'show',
             'type'
@@ -400,7 +420,7 @@ class Timeslot(
     @classmethod
     def meta_sources(cls):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
-        return [lass.metadata.query.own(with_default=True)]
+        return [lass.metadata.query.own]
 
     @classmethod
     def annotate(cls, timeslots):
@@ -444,6 +464,34 @@ class Timeslot(
                     else:
                         show_timeslot.text[key] = value
         lass.schedule.blocks.annotate(timeslots)
+
+
+class TimeslotText(lass.metadata.models.Text):
+    __tablename__ = 'show_season_timeslot_text_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_season_timeslot_text_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Timeslot.id))
+    subject = sqlalchemy.orm.relationship(Timeslot, backref='text_entries')
+
+
+class TimeslotImage(lass.metadata.models.Image):
+    __tablename__ = 'show_season_timeslot_image_metadata'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_season_timeslot_image_metadata_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Timeslot.id))
+    subject = sqlalchemy.orm.relationship(Timeslot, backref='image_entries')
 
 
 class Message(lass.model_base.Base):
