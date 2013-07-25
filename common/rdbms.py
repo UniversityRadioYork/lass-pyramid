@@ -200,35 +200,6 @@ def transient_active_on(date, transient):
     )
 
 
-def nameables_equal(table, key):
-    """Generalised check to filter 'table' down to rows referencing 'key' in
-    ways analogous to the 'Nameable' model mixin.
-
-    This comparison expects 'table' to contain two columns, 'id' and 'name',
-    such that if 'key' is an integer it is compared against 'id'; if it is a
-    string it is compared against 'name'; and if it is an object it is expected
-    to be a model with table 'table' and is compared on its columns.
-
-    Generally, 'table' will belong to a model with the 'Nameable' mixin, hence
-    the name.
-
-    Args:
-        table: a metadata database table (usually from 'metadata_table).
-        key: a string (key name), ID (key id) or other object (key) to filter
-            using.
-    Returns:
-        A SQL condition that, attached to a WHERE, will filter metadata down to
-        those rows with this key.
-    """
-    for k_type, func in NAMEABLES_EQUAL_GETTERS.items():
-        if isinstance(key, k_type):
-            result = func(table, key)
-            break
-    else:
-        raise TypeError('No match in NAMEABLES_EQUAL_GETTERS: {}'.format(key))
-    return result
-
-
 def inferred_table(subject_table, namer, creator):
     """Creates or gets a table whose name and other properties are 'inferred'
     from another table.
@@ -316,12 +287,3 @@ def find_foreign_key_to(column, source_table, target_table):
                 column_name
             )
         )
-
-
-def indirect_join(left, right, through):
-    """Performs an indirect join from 'left' to 'right' via 'through'.
-
-    'left' and 'through', and 'through' and 'right', must have matched pairs of
-    primary and foreign keys (the foreign keys being on 'through') to work.
-    """
-    return left.join(through).join(right)
