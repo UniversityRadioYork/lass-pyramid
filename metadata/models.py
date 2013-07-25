@@ -175,7 +175,7 @@ class Package(
 
 class PackageText(Text):
     __tablename__ = 'package_text_metadata'
-    __table_args__ = {'schema': 'schedule'}
+    __table_args__ = {'schema': 'metadata'}
     __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
     id = sqlalchemy.Column(
         'package_text_metadata_id',
@@ -183,13 +183,16 @@ class PackageText(Text):
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Package.id))
+    subject_id = sqlalchemy.Column(
+        'package_id',
+        sqlalchemy.ForeignKey(Package.id)
+    )
     subject = sqlalchemy.orm.relationship(Package, backref='text_entries')
 
 
 class PackageImage(Image):
     __tablename__ = 'package_image_metadata'
-    __table_args__ = {'schema': 'schedule'}
+    __table_args__ = {'schema': 'metadata'}
     __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
     id = sqlalchemy.Column(
         'package_image_metadata_id',
@@ -197,7 +200,10 @@ class PackageImage(Image):
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Package.id))
+    subject_id = sqlalchemy.Column(
+        'package_id',
+        sqlalchemy.ForeignKey(Package.id)
+    )
     subject = sqlalchemy.orm.relationship(Package, backref='image_entries')
 
 # There is also a table 'xyz_package_entry' for every MetadataSubject xyz that

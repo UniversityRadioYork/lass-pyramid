@@ -40,15 +40,13 @@ def show_detail(request):
 
     # Make sure the ID corresponds to a show that has a ShowDB entry.
     show_id = request.matchdict['showid']
-    show = lass.schedule.models.Show.query.in_showdb().filter(
-        lass.schedule.models.Show.id == show_id
+    show = lass.model_base.DBSession.query(
+        lass.schedule.models.Show
     ).options(
-        sqlalchemy.orm.joinedload(
-            lass.schedule.models.Show.seasons,
-            lass.schedule.models.Season.timeslots
-        )
-    ).first()
-    if not show:
+        sqlalchemy.orm.joinedload('seasons', 'timeslots')
+    ).get(show_id)
+
+    if not (show and show.type.has_showdb_entry):
         raise pyramid.exceptions.NotFound(
             'Could not get details for any show with ID {}.'.format(
                 show_id
@@ -75,12 +73,13 @@ def season_detail(request):
 
     # Make sure the ID corresponds to a season that has a ShowDB entry.
     season_id = request.matchdict['seasonid']
-    season = lass.schedule.models.Season.query.in_showdb().filter(
-        lass.schedule.models.Season.id == season_id
+    season = lass.model_base.DBSession.query(
+        lass.schedule.models.Season
     ).options(
-        sqlalchemy.orm.joinedload(lass.schedule.models.Season.timeslots)
-    ).first()
-    if not season:
+        sqlalchemy.orm.joinedload('timeslots')
+    ).get(season_id)
+
+    if not (season and season.show.type.has_showdb_entry):
         raise pyramid.exceptions.NotFound(
             'Could not get details for any season with ID {}.'.format(
                 season_id
@@ -103,11 +102,10 @@ def timeslot_detail(request):
 
     # Make sure the ID corresponds to a timeslot that has a ShowDB entry.
     timeslot_id = request.matchdict['timeslotid']
-    timeslot = lass.schedule.models.Timeslot.query.filter(
-        lass.schedule.models.ShowType.has_showdb_entry,
-        lass.schedule.models.Timeslot.id == timeslot_id
-    ).first()
-    if not timeslot:
+    timeslot = lass.model_base.DBSession.query(
+        lass.schedule.models.Timeslot
+    ).get(timeslot_id)
+    if not (timeslot and timeslot.season.show.type.has_showdb_entry):
         raise pyramid.exceptions.NotFound(
             'Could not get details for any timeslot with ID {}.'.format(
                 timeslot_id

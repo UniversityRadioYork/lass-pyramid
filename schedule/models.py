@@ -152,21 +152,13 @@ class Show(
         Args:
             shows: A list of shows to annotate in-place.
         """
-        cls.add_meta(
-            shows,
-            'text',
-            'title', 'description', 'tags'
-        )
-        cls.add_meta(
-            shows,
-            'image',
-            'image', 'thumbnail_image', 'player_image'
-        )
+        cls.add_meta(shows, 'text', 'title', 'description', 'tags')
+        cls.add_meta(shows, 'image', 'image', 'thumbnail_image', 'player_image')
         cls.add_credits(shows, with_byline_attr='byline')
 
 
 class ShowText(lass.metadata.models.Text):
-    __tablename__ = 'show_text_metadata'
+    __tablename__ = 'show_metadata'
     __table_args__ = {'schema': 'schedule'}
     __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
     id = sqlalchemy.Column(
@@ -467,30 +459,36 @@ class Timeslot(
 
 
 class TimeslotText(lass.metadata.models.Text):
-    __tablename__ = 'show_season_timeslot_text_metadata'
+    __tablename__ = 'timeslot_metadata'
     __table_args__ = {'schema': 'schedule'}
     __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
     id = sqlalchemy.Column(
-        'show_season_timeslot_text_metadata_id',
+        'timeslot_metadata_id',
         sqlalchemy.Integer,
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Timeslot.id))
+    subject_id = sqlalchemy.Column(
+        'show_season_timeslot_id',
+        sqlalchemy.ForeignKey(Timeslot.id)
+    )
     subject = sqlalchemy.orm.relationship(Timeslot, backref='text_entries')
 
 
 class TimeslotImage(lass.metadata.models.Image):
-    __tablename__ = 'show_season_timeslot_image_metadata'
+    __tablename__ = 'timeslot_image_metadata'
     __table_args__ = {'schema': 'schedule'}
     __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
     id = sqlalchemy.Column(
-        'show_season_timeslot_image_metadata_id',
+        'timeslot_image_metadata_id',
         sqlalchemy.Integer,
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Timeslot.id))
+    subject_id = sqlalchemy.Column(
+        'show_season_timeslot_id',
+        sqlalchemy.ForeignKey(Timeslot.id)
+    )
     subject = sqlalchemy.orm.relationship(Timeslot, backref='image_entries')
 
 
