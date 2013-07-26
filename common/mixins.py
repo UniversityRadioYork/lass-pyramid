@@ -2,6 +2,8 @@
 
 import sqlalchemy
 
+import lass.model_base
+
 
 # Column generators for inclusion in non-ORM SQL.
 # Note that these MUST be lambda'd to prevent the same column being used in
@@ -19,9 +21,6 @@ submitted_at_column = lambda: sqlalchemy.Column(
     sqlalchemy.DateTime(timezone=True),
     nullable=True  # Not submitted/no submission recorded
 )
-
-
-transient_columns = lambda: effective_from_column(), effective_to_column()
 
 
 class Described(object):

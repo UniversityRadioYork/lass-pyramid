@@ -41,6 +41,7 @@ import lass.metadata
 import lass.music
 import lass.model_base
 import lass.people.mixins
+import lass.credits.models
 
 
 class ScheduleModel(lass.model_base.Base):
@@ -161,49 +162,29 @@ class Show(
         cls.add_meta(shows, 'image', 'image', 'thumbnail_image', 'player_image')
 
 
-class ShowText(lass.metadata.models.Text):
+class ShowAttachable(ScheduleModel):
+    """Base class for all models defining an attachable bound to shows."""
+    __abstract__ = True
+    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
+
+    subject_id_field = 'show_id'
+    subject_id_target = Show.id
+    subject_target = Show
+
+
+class ShowText(ShowAttachable, lass.metadata.models.Text):
     __tablename__ = 'show_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
-    id = sqlalchemy.Column(
-        'show_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
-    subject = sqlalchemy.orm.relationship(Show, backref='text_entries')
+    primary_key_field = 'show_metadata_id'
 
 
-class ShowImage(lass.metadata.models.Image):
+class ShowImage(ShowAttachable, lass.metadata.models.Image):
     __tablename__ = 'show_image_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
-    id = sqlalchemy.Column(
-        'show_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
-    subject = sqlalchemy.orm.relationship(Show, backref='image_entries')
+    primary_key_field = 'show_image_metadata_id'
 
 
-class ShowCredit(lass.people.models.Credit):
+class ShowCredit(ShowAttachable, lass.credits.models.Credit):
     __tablename__ = 'show_credit'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
-    id = sqlalchemy.Column(
-        'show_credit_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
-    subject = sqlalchemy.orm.relationship(
-        Show,
-        backref='credits'
-    )
+    primary_key_field = 'show_credit_id'
 
 
 #
@@ -334,38 +315,27 @@ class Season(
                         show_season.text[key] = value
 
 
-class SeasonText(lass.metadata.models.Text):
+class SeasonAttachable(ScheduleModel):
+    """Base class for all models defining an attachable bound to Seasons."""
+    __abstract__ = True
+    __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
+
+    subject_id_field = 'season_id'
+    subject_id_target = Season.id
+    subject_target = Season
+
+
+class SeasonText(SeasonAttachable, lass.metadata.models.Text):
     __tablename__ = 'season_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
-    id = sqlalchemy.Column(
-        'season_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'show_season_id',
-        sqlalchemy.ForeignKey(Season.id)
-    )
-    subject = sqlalchemy.orm.relationship(Season, backref='text_entries')
+    primary_key_field = 'season_metadata_id'
 
 
-class SeasonImage(lass.metadata.models.Image):
+class SeasonImage(SeasonAttachable, lass.metadata.models.Image):
     __tablename__ = 'season_image_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
-    id = sqlalchemy.Column(
-        'season_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'show_season_id',
-        sqlalchemy.ForeignKey(Season.id)
-    )
-    subject = sqlalchemy.orm.relationship(Season, backref='image_entries')
+    primary_key_field = 'season_image_metadata_id'
+
+
+# Currently seasons have no credits.
 
 
 #
@@ -549,58 +519,29 @@ class Timeslot(
         lass.schedule.blocks.annotate(timeslots)
 
 
-class TimeslotText(lass.metadata.models.Text):
+class TimeslotAttachable(ScheduleModel):
+    """Base class for all models defining an attachable bound to Timeslots."""
+    __abstract__ = True
+    __mapper_args__ = {'polymorphic_identity': 'Timeslot', 'concrete': True}
+
+    subject_id_field = 'show_season_timeslot_id'
+    subject_id_target = Timeslot.id
+    subject_target = Timeslot
+
+
+class TimeslotText(TimeslotAttachable, lass.metadata.models.Text):
     __tablename__ = 'timeslot_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
-    id = sqlalchemy.Column(
-        'timeslot_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'show_season_timeslot_id',
-        sqlalchemy.ForeignKey(Timeslot.id)
-    )
-    subject = sqlalchemy.orm.relationship(Timeslot, backref='text_entries')
+    primary_key_field = 'timeslot_metadata_id'
 
 
-class TimeslotImage(lass.metadata.models.Image):
+class TimeslotImage(TimeslotAttachable, lass.metadata.models.Image):
     __tablename__ = 'timeslot_image_metadata'
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
-    id = sqlalchemy.Column(
-        'timeslot_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'show_season_timeslot_id',
-        sqlalchemy.ForeignKey(Timeslot.id)
-    )
-    subject = sqlalchemy.orm.relationship(Timeslot, backref='image_entries')
+    primary_key_field = 'timeslot_image_metadata_id'
 
 
-class TimeslotCredit(lass.people.models.Credit):
+class TimeslotCredit(TimeslotAttachable, lass.credits.models.Credit):
     __tablename__ = 'show_season_timeslot_credit'  # Actually a view
-    __table_args__ = {'schema': 'schedule'}
-    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
-    id = sqlalchemy.Column(
-        'show_season_timeslot_credit_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'show_season_timeslot_id',
-        sqlalchemy.ForeignKey(Timeslot.id)
-    )
-    subject = sqlalchemy.orm.relationship(
-        Timeslot,
-        backref=sqlalchemy.orm.backref('credits', lazy='subquery')
-    )
+    primary_key_field = 'show_season_timeslot_credit_id'
 
 
 #

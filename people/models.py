@@ -5,61 +5,7 @@ import sqlalchemy
 import lass.model_base
 import lass.common.mixins
 import lass.people.mixins
-
-
-class CreditType(lass.model_base.Base, lass.common.mixins.Named):
-    """A type of credit."""
-    __tablename__ = 'credit_type'
-    __table_args__ = {'schema': 'people'}
-
-    id = sqlalchemy.Column(
-        'credit_type_id',
-        sqlalchemy.Integer(),
-        primary_key=True,
-        nullable=False
-    )
-    plural = sqlalchemy.Column(sqlalchemy.String(length=255), nullable=False)
-    is_in_byline = sqlalchemy.Column(
-        sqlalchemy.Boolean(),
-        nullable=False,
-        server_default='FALSE'
-    )
-
-
-class Credit(
-    sqlalchemy.ext.declarative.AbstractConcreteBase,
-    lass.model_base.Base,
-    lass.common.mixins.Transient,
-    lass.people.mixins.Ownable,
-    lass.people.mixins.Approvable
-):
-    """Abstract model for credits, to be extended for each creditable."""
-    @sqlalchemy.ext.declarative.declared_attr
-    def credit_type_id(cls):
-        return sqlalchemy.Column(
-            sqlalchemy.ForeignKey(
-                'people.credit_type.credit_type_id'
-            )
-        )
-
-    @sqlalchemy.ext.declarative.declared_attr
-    def type(cls):
-        return sqlalchemy.orm.relationship('CreditType', lazy='joined')
-
-    @sqlalchemy.ext.declarative.declared_attr
-    def person_id(cls):
-        return sqlalchemy.Column(
-            'creditid',
-            sqlalchemy.ForeignKey('member.memberid')
-        )
-
-    @sqlalchemy.ext.declarative.declared_attr
-    def person(cls):
-        return sqlalchemy.orm.relationship(
-            'Person',
-            lazy='joined',
-            primaryjoin='Person.id == {}.person_id'.format(cls.__name__)
-        )
+import lass.metadata.mixins
 
 
 class Person(lass.model_base.Base):

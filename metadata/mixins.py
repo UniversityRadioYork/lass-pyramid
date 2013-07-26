@@ -7,9 +7,11 @@ import collections
 import datetime
 import functools
 
+import lass.model_base
 import lass.common.time
 import lass.common.utils
 import lass.metadata.query
+import lass.people.mixins
 
 
 class MetadataSubject(object):
@@ -38,7 +40,6 @@ class MetadataSubject(object):
                 cls.bulk_meta(items, meta_type, *keys, date=date),
                 attribute_name=attr if attr else meta_type
             )
-
 
     @classmethod
     def meta_sources(cls):

@@ -7,16 +7,22 @@ tables for retrieving metadata.  See 'metadata.rdbms' for more information.
 import sqlalchemy
 
 import lass.common.mixins
+import lass.metadata.mixins
 import lass.model_base
 import lass.people.mixins
 
 
-class Key(lass.model_base.Base, lass.common.mixins.Type):
+class MetadataModel(lass.model_base.Base):
+    """Base for all models living in the metadata schema."""
+    __abstract__ = True
+    __table_args__ = {'schema': 'metadata'}
+
+
+class Key(MetadataModel, lass.common.mixins.Type):
     """A metadata key, which defines the semantics of a piece of
     metadata.
     """
     __tablename__ = 'metadata_key'
-    __table_args__ = {'schema': 'metadata'}
 
     id = sqlalchemy.Column(
         'metadata_key_id',
@@ -52,9 +58,33 @@ class Attachable(
 ):
     """Abstract base for any model that can be 'attached' to another model,
     thus creating a new model class and table specific to that model.
+
+    Used primarily for two things: metadata, packages and credits.
     """
     __abstract__ = False
-    pass
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def id(cls):
+        return sqlalchemy.Column(
+            cls.primary_key_field,
+            sqlalchemy.Integer,
+            primary_key=True,
+            nullable=False
+        )
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def subject_id(cls):
+        return sqlalchemy.Column(
+            cls.subject_id_field,
+            sqlalchemy.ForeignKey(cls.subject_id_target)
+        )
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def subject(cls):
+        return sqlalchemy.orm.relationship(
+            cls.subject_target,
+            backref=cls.backref
+        )
 
 
 class Item(Attachable):
@@ -78,20 +108,16 @@ class Text(Item):
     """Abstract model for an item of textual metadata."""
     __abstract__ = True
 
-    value = sqlalchemy.Column(
-        'metadata_value',
-        sqlalchemy.Text
-    )
+    value = sqlalchemy.Column('metadata_value', sqlalchemy.Text)
+    backref = 'text_entries'
 
 
 class Image(Item):
     """Abstract model for an item of image metadata."""
     __abstract__ = True
 
-    value = sqlalchemy.Column(
-        'metadata_value',
-        sqlalchemy.String(255)
-    )
+    value = sqlalchemy.Column('metadata_value', sqlalchemy.String(255))
+    backref = 'image_entries'
 
 
 # NB: Package is technically a metadata subject, but do NOT add
@@ -117,38 +143,23 @@ class Package(
     weight = sqlalchemy.Column('weight', sqlalchemy.Integer)
 
 
-class PackageText(Text):
+class PackageAttachable(MetadataModel):
+    """Base class for all models defining an attachable bound to packages."""
+    __abstract__ = True
+    __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
+
+    subject_id_field = 'package_id'
+    subject_id_target = Package.id
+    subject_target = Package 
+
+class PackageText(PackageAttachable, Text):
     __tablename__ = 'package_text_metadata'
-    __table_args__ = {'schema': 'metadata'}
-    __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
-    id = sqlalchemy.Column(
-        'package_text_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'package_id',
-        sqlalchemy.ForeignKey(Package.id)
-    )
-    subject = sqlalchemy.orm.relationship(Package, backref='text_entries')
+    primary_key_field = 'package_text_metadata_id'
 
 
-class PackageImage(Image):
+class PackageImage(PackageAttachable, Image):
     __tablename__ = 'package_image_metadata'
-    __table_args__ = {'schema': 'metadata'}
-    __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
-    id = sqlalchemy.Column(
-        'package_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'package_id',
-        sqlalchemy.ForeignKey(Package.id)
-    )
-    subject = sqlalchemy.orm.relationship(Package, backref='image_entries')
+    primary_key_field = 'package_image_metadata_id'
 
 
 class PackageEntry(Attachable):
@@ -158,6 +169,7 @@ class PackageEntry(Attachable):
     model.
     """
     __abstract__ = True
+    backref = 'podcast_entries'
 
     @sqlalchemy.ext.declarative.declared_attr
     def package_id(cls):

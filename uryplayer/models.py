@@ -38,8 +38,10 @@ import sqlalchemy
 
 import lass.common.mixins
 import lass.model_base
-import lass.metadata.mixins
 import lass.people.mixins
+import lass.metadata.mixins
+import lass.metadata.models
+import lass.credits.models
 
 
 class URYPlayerModel(lass.model_base.Base):
@@ -77,69 +79,31 @@ class Podcast(
         cls.add_meta(podcasts, 'image', 'thumbnail_image', 'player_image')
 
 
-class PodcastText(lass.metadata.models.Text):
+class PodcastAttachable(URYPlayerModel):
+    """Base class for all models defining an attachable bound to podcasts."""
+    __abstract__ = True
+    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
+
+    subject_id_field = 'podcast_id'
+    subject_id_target = Podcast.id
+    subject_target = Podcast
+
+
+class PodcastText(PodcastAttachable, lass.metadata.models.Text):
     __tablename__ = 'podcast_metadata'
-    __table_args__ = {'schema': 'uryplayer'}
-    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
-    id = sqlalchemy.Column(
-        'podcast_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'podcast_id',
-        sqlalchemy.ForeignKey(Podcast.id)
-    )
-    subject = sqlalchemy.orm.relationship(Podcast, backref='text_entries')
+    primary_key_field = 'podcast_metadata_id'
 
 
-class PodcastImage(lass.metadata.models.Image):
+class PodcastImage(PodcastAttachable, lass.metadata.models.Image):
     __tablename__ = 'podcast_image_metadata'
-    __table_args__ = {'schema': 'uryplayer'}
-    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
-    id = sqlalchemy.Column(
-        'podcast_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'podcast_id',
-        sqlalchemy.ForeignKey(Podcast.id)
-    )
-    subject = sqlalchemy.orm.relationship(Podcast, backref='image_entries')
+    primary_key_field = 'podcast_image_metadata_id'
 
 
-class PodcastPackageEntry(lass.metadata.models.PackageEntry):
+class PodcastPackageEntry(PodcastAttachable, lass.metadata.models.PackageEntry):
     __tablename__ = 'podcast_package_entry'
-    __table_args__ = {'schema': 'uryplayer'}
-    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
-    id = sqlalchemy.Column(
-        'podcast_image_metadata_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'podcast_id',
-        sqlalchemy.ForeignKey(Podcast.id)
-    )
-    subject = sqlalchemy.orm.relationship(Podcast, backref='package_entries')
+    primary_key_field = 'podcast_package_entry_id'
 
 
-class PodcastCredit(lass.people.models.Credit):
+class PodcastCredit(PodcastAttachable, lass.credits.models.Credit):
     __tablename__ = 'podcast_credit'
-    __table_args__ = {'schema': 'uryplayer'}
-    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
-    id = sqlalchemy.Column(
-        'podcast_credit_id',
-        sqlalchemy.Integer,
-        primary_key=True,
-        nullable=False
-    )
-    subject_id = sqlalchemy.Column(
-        'podcast_id',
-        sqlalchemy.ForeignKey(Podcast.id)
-    )
-    subject = sqlalchemy.orm.relationship(Podcast, backref='credits')
+    primary_key_field = 'podcast_credit_id'
