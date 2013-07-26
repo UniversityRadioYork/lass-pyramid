@@ -6,11 +6,6 @@ import sqlalchemy
 # Column generators for inclusion in non-ORM SQL.
 # Note that these MUST be lambda'd to prevent the same column being used in
 # multiple models/tables.
-description_column = lambda: sqlalchemy.Column(
-    'description',
-    sqlalchemy.Text(),
-    nullable=False
-)
 effective_from_column = lambda: sqlalchemy.Column(
     'effective_from',
     sqlalchemy.DateTime(timezone=True)
@@ -18,11 +13,6 @@ effective_from_column = lambda: sqlalchemy.Column(
 effective_to_column = lambda: sqlalchemy.Column(
     'effective_to',
     sqlalchemy.DateTime(timezone=True)
-)
-name_column = lambda: sqlalchemy.Column(
-    'name',
-    sqlalchemy.String(50),
-    nullable=False
 )
 submitted_at_column = lambda: sqlalchemy.Column(
     'submitted',
@@ -41,12 +31,17 @@ class Described(object):
     generally you will want to use metadata for most describable items as
     Described does not implement history.
     """
-    description = description_column()
-
+    description = sqlalchemy.Column(
+        sqlalchemy.Text,
+        nullable=False
+    )
 
 class Named(object):
     """Mixin for models whose items have an internal name."""
-    name = name_column()
+    name = sqlalchemy.Column(
+        sqlalchemy.String(50),
+        nullable=False
+    )
 
     def __str__(self):
         return self.name

@@ -125,7 +125,7 @@ def media_list(request, all_items):
     }
 
 
-def detail(request, id_name, source, target_name='item'):
+def detail(request, id_name, source, target_name='item', constraint=None):
     """Implements a generic item detail view function.
 
     NOTE: At the moment, 'source' must have a column named 'id' to be matched
@@ -141,10 +141,17 @@ def detail(request, id_name, source, target_name='item'):
             for which details can be found.
         target_name: The name to give to the template variable containing the
             item itself.  (Default: 'item'.)
+        constraint: An optional function taking any matched item and returning
+            True if it is allowed to have a detail page, and False otherwise.
+            If not present, assume all items are allowed a detail page.
+            (Default: None.)
 
     Returns:
         A dict suitable for returning from a rendered detail view.
     """
+    if not constraint:
+        constraint = lambda _: True
+
     item_id_str = request.matchdict[id_name]
     try:
         item_id = int(item_id_str)
@@ -154,7 +161,7 @@ def detail(request, id_name, source, target_name='item'):
         )
 
     item = source.get(item_id)
-    if not item:
+    if not (item and constraint(item)):
         raise pyramid.exceptions.NotFound(
             'Could not get details for any item with ID {}.'.format(
                 item_id

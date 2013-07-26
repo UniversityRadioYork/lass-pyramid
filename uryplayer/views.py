@@ -57,7 +57,11 @@ def podcasts(request):
     """Displays a list of podcasts."""
     return lass.common.view_helpers.media_list(
         request,
-        lass.uryplayer.models.Podcast.query.order_by(
+        lass.model_base.DBSession.query(
+            lass.uryplayer.models.Podcast
+        ).options(
+            sqlalchemy.orm.subqueryload('credits')
+        ).order_by(
             sqlalchemy.desc(lass.uryplayer.models.Podcast.submitted_at)
         )
     )
@@ -73,7 +77,11 @@ def podcast_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='podcastid',
-        source=lass.uryplayer.models.Podcast.query,
+        source=lass.model_base.DBSession.query(
+            lass.uryplayer.models.Podcast
+        ).options(
+            sqlalchemy.orm.joinedload('credits')
+        ),
         target_name='podcast'
     )
 

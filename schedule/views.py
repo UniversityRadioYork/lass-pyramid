@@ -21,6 +21,8 @@ def shows(request):
             lass.schedule.models.Show.seasons.any(
                 lass.schedule.models.Season.timeslots.any()
             )
+        ).options(
+            sqlalchemy.orm.subqueryload('credits')
         ).order_by(
             sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
         )
@@ -37,29 +39,20 @@ def show_detail(request):
     This view expects the show's seasons to be listed, and thus these are
     eagerly loaded.
     """
+    return lass.common.view_helpers.detail(
+        request,
+        id_name='showid',
+        source=lass.model_base.DBSession.query(
+            lass.schedule.models.Show
+        ).options(
+            sqlalchemy.orm.joinedload('seasons', 'timeslots'),
+            sqlalchemy.orm.joinedload('credits')
+        ),
+        constraint=lambda show: show.type.has_showdb_entry,
+        target_name='show'
+    )
 
-    # Make sure the ID corresponds to a show that has a ShowDB entry.
-    show_id = request.matchdict['showid']
-    show = lass.model_base.DBSession.query(
-        lass.schedule.models.Show
-    ).options(
-        sqlalchemy.orm.joinedload('seasons', 'timeslots')
-    ).get(show_id)
 
-    if not (show and show.type.has_showdb_entry):
-        raise pyramid.exceptions.NotFound(
-            'Could not get details for any show with ID {}.'.format(
-                show_id
-            )
-        )
-
-    lass.schedule.models.Show.annotate([show])
-
-    return {
-        'show': show
-    }
-    
-    
 @pyramid.view.view_config(
     route_name='schedule-season-detail',
     renderer='schedule/season_detail.jinja2'
@@ -70,27 +63,17 @@ def season_detail(request):
     This view expects the season's timeslots to be listed, and thus these are
     eagerly loaded.
     """
-
-    # Make sure the ID corresponds to a season that has a ShowDB entry.
-    season_id = request.matchdict['seasonid']
-    season = lass.model_base.DBSession.query(
-        lass.schedule.models.Season
-    ).options(
-        sqlalchemy.orm.joinedload('timeslots')
-    ).get(season_id)
-
-    if not (season and season.show.type.has_showdb_entry):
-        raise pyramid.exceptions.NotFound(
-            'Could not get details for any season with ID {}.'.format(
-                season_id
-            )
-        )
-
-    lass.schedule.models.Show.annotate([season.show])
-
-    return {
-        'season': season
-    }
+    return lass.common.view_helpers.detail(
+        request,
+        id_name='seasonid',
+        source=lass.model_base.DBSession.query(
+            lass.schedule.models.Season
+        ).options(
+            sqlalchemy.orm.joinedload('timeslots'),
+        ),
+        constraint=lambda season: season.show.type.has_showdb_entry,
+        target_name='season'
+    )
 
 
 @pyramid.view.view_config(
@@ -99,24 +82,17 @@ def season_detail(request):
 )
 def timeslot_detail(request):
     """Displays detail about a timeslot."""
-
-    # Make sure the ID corresponds to a timeslot that has a ShowDB entry.
-    timeslot_id = request.matchdict['timeslotid']
-    timeslot = lass.model_base.DBSession.query(
-        lass.schedule.models.Timeslot
-    ).get(timeslot_id)
-    if not (timeslot and timeslot.season.show.type.has_showdb_entry):
-        raise pyramid.exceptions.NotFound(
-            'Could not get details for any timeslot with ID {}.'.format(
-                timeslot_id
-            )
-        )
-
-    lass.schedule.models.Timeslot.annotate([timeslot])
-
-    return {
-        'timeslot': timeslot
-    }
+    return lass.common.view_helpers.detail(
+        request,
+        id_name='timeslotid',
+        source=lass.model_base.DBSession.query(
+            lass.schedule.models.Timeslot
+        ).options(
+            sqlalchemy.orm.joinedload('credits'),
+        ),
+        constraint=lambda timeslot: timeslot.season.show.type.has_showdb_entry,
+        target_name='timeslot'
+    )
 
 
 @pyramid.view.view_config(

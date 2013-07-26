@@ -172,6 +172,8 @@ def from_to(source, start, finish):
                 lass.schedule.models.Timeslot.duration
             ) > start
         )
+    ).options(
+        sqlalchemy.orm.subqueryload('credits')
     ).order_by(
         sqlalchemy.asc(lass.schedule.models.Timeslot.start)
     ).all()
@@ -201,6 +203,8 @@ def next(source, start, finish, count):
             lass.schedule.models.Timeslot.start +
             lass.schedule.models.Timeslot.duration
         ) > start
+    ).options(
+        sqlalchemy.orm.subqueryload('credits')
     ).order_by(
         sqlalchemy.asc(lass.schedule.models.Timeslot.start)
     ).limit(count).all()

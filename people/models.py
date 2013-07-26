@@ -2,23 +2,13 @@
 
 import sqlalchemy
 
+import lass.model_base
 import lass.common.rdbms
+import lass.common.mixins
+import lass.people.mixins
 
 
-def person_foreign_key(*args, **keywords):
-    """Defines a foreign key to a 'Person'.
-
-    To specify the column name, supply 'name' as a keyword argument; otherwise
-    the name will be inferred from 'Person.id'.
-    """
-    return lass.common.rdbms.foreign_key_from(
-        Person.id,
-        *args,
-        **keywords
-    )
-
-
-class CreditType(lass.Base, lass.common.mixins.Type):
+class CreditType(lass.model_base.Base, lass.common.mixins.Named):
     """A type of credit."""
     __tablename__ = 'credit_type'
     __table_args__ = {'schema': 'people'}
@@ -37,7 +27,43 @@ class CreditType(lass.Base, lass.common.mixins.Type):
     )
 
 
-class Person(lass.Base):
+class Credit(
+    sqlalchemy.ext.declarative.AbstractConcreteBase,
+    lass.model_base.Base,
+    lass.common.mixins.Transient,
+    lass.people.mixins.Ownable,
+    lass.people.mixins.Approvable
+):
+    """Abstract model for credits, to be extended for each creditable."""
+    @sqlalchemy.ext.declarative.declared_attr
+    def credit_type_id(cls):
+        return sqlalchemy.Column(
+            sqlalchemy.ForeignKey(
+                'people.credit_type.credit_type_id'
+            )
+        )
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def type(cls):
+        return sqlalchemy.orm.relationship('CreditType', lazy='joined')
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def person_id(cls):
+        return sqlalchemy.Column(
+            'creditid',
+            sqlalchemy.ForeignKey('member.memberid')
+        )
+
+    @sqlalchemy.ext.declarative.declared_attr
+    def person(cls):
+        return sqlalchemy.orm.relationship(
+            'Person',
+            lazy='joined',
+            primaryjoin='Person.id == {}.person_id'.format(cls.__name__)
+        )
+
+
+class Person(lass.model_base.Base):
     """A person in the membership database."""
     __tablename__ = 'member'
 
@@ -51,27 +77,28 @@ class Person(lass.Base):
     first_name = sqlalchemy.Column('fname', sqlalchemy.String(255))
     last_name = sqlalchemy.Column('sname', sqlalchemy.String(255))
     sex = sqlalchemy.Column(
-        'sex',
         sqlalchemy.Enum('m', 'f', name='sex', native_enum=False)
     )
 
-    local_name = sqlalchemy.Column(sqlalchemy.String(100))
-    local_alias = sqlalchemy.Column(sqlalchemy.String(32))
+    # A lot of fields below were present in the member table but are not
+    # part of the model for security purposes.
 
-    phone = sqlalchemy.Column(sqlalchemy.String(255))
-    email = sqlalchemy.Column(sqlalchemy.String(255))
-    receive_email = sqlalchemy.Column(
-        sqlalchemy.Boolean,
-        server_default='TRUE'
-    )
+    #local_name = sqlalchemy.Column(sqlalchemy.String(100))
+    #local_alias = sqlalchemy.Column(sqlalchemy.String(32))
 
-    password = sqlalchemy.Column(sqlalchemy.String(255))
-    account_locked = sqlalchemy.Column(
-        sqlalchemy.Boolean,
-        server_default='FALSE'
-    )
+    #phone = sqlalchemy.Column(sqlalchemy.String(255))
+    #email = sqlalchemy.Column(sqlalchemy.String(255))
+    #receive_email = sqlalchemy.Column(
+    #    sqlalchemy.Boolean,
+    #    server_default='TRUE'
+    #)
 
-    last_login = sqlalchemy.Column(sqlalchemy.DateTime)
-    end_of_course = sqlalchemy.Column('endofcourse', sqlalchemy.DateTime)
-    eduroam = sqlalchemy.Column('eduroam', sqlalchemy.String(255))
+    #account_locked = sqlalchemy.Column(
+    #    sqlalchemy.Boolean,
+    #    server_default='FALSE'
+    #)
+
+    #last_login = sqlalchemy.Column(sqlalchemy.DateTime)
+    #end_of_course = sqlalchemy.Column('endofcourse', sqlalchemy.DateTime)
+    #eduroam = sqlalchemy.Column('eduroam', sqlalchemy.String(255))
     date_joined = sqlalchemy.Column('joined', sqlalchemy.DateTime)

@@ -50,8 +50,8 @@ class ScheduleModel(lass.model_base.Base):
 
 
 class ShowType(
-    lass.common.mixins.Type,
-    ScheduleModel
+    ScheduleModel,
+    lass.common.mixins.Type
 ):
     """A type of show in the schedule.
 
@@ -90,11 +90,16 @@ class ShowType(
     )
 
 
+#
+# Shows and their attachables
+#
+
+
 class Show(
+    ScheduleModel,
+    lass.common.mixins.Submittable,
     lass.metadata.mixins.MetadataSubject,
-    lass.people.mixins.PersonSubmittable,
-    lass.people.mixins.Creditable,
-    ScheduleModel
+    lass.people.mixins.Ownable
 ):
     __tablename__ = 'show'
 
@@ -154,7 +159,6 @@ class Show(
         """
         cls.add_meta(shows, 'text', 'title', 'description', 'tags')
         cls.add_meta(shows, 'image', 'image', 'thumbnail_image', 'player_image')
-        cls.add_credits(shows, with_byline_attr='byline')
 
 
 class ShowText(lass.metadata.models.Text):
@@ -185,7 +189,29 @@ class ShowImage(lass.metadata.models.Image):
     subject = sqlalchemy.orm.relationship(Show, backref='image_entries')
 
 
-class Term(lass.Base):
+class ShowCredit(lass.people.models.Credit):
+    __tablename__ = 'show_credit'
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'show', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_credit_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column('show_id', sqlalchemy.ForeignKey(Show.id))
+    subject = sqlalchemy.orm.relationship(
+        Show,
+        backref='credits'
+    )
+
+
+#
+# Terms
+#
+
+
+class Term(lass.model_base.Base):
     # NB: Term is not in the schedule schema.
     __tablename__ = 'terms'
     query = lass.model_base.DBSession.query_property()
@@ -227,10 +253,16 @@ class Term(lass.Base):
         ).first()
 
 
+#
+# Seasons and their attachables
+#
+
+
 class Season(
+    ScheduleModel,
+    lass.common.mixins.Submittable,
     lass.metadata.mixins.MetadataSubject,
-    lass.people.mixins.PersonSubmittable,
-    ScheduleModel
+    lass.people.mixins.Ownable
 ):
     """A show season.
 
@@ -285,6 +317,11 @@ class SeasonImage(lass.metadata.models.Image):
     subject = sqlalchemy.orm.relationship(Season, backref='image_entries')
 
 
+#
+# Timeslots and their attachables
+#
+
+
 class BaseTimeslot(object):
     """The common level of functionality available on both data-model and
     pseudo-timeslots.
@@ -305,11 +342,11 @@ class BaseTimeslot(object):
 
 
 class Timeslot(
+    BaseTimeslot,
+    ScheduleModel,
     lass.metadata.mixins.MetadataSubject,
     lass.people.mixins.Approvable,
-    lass.people.mixins.Ownable,
-    ScheduleModel,
-    BaseTimeslot
+    lass.people.mixins.Ownable
 ):
     """A schedule timeslot."""
     __tablename__ = 'show_season_timeslot'
@@ -388,6 +425,13 @@ class Timeslot(
         )
 
     @property
+    def credits(self):
+        """Retrieves relevant credits for this timeslot."""
+        return self.season.show.credits.filter(
+            lass.common.rdbms.transient_active_on(self.start, ShowCredit)
+        )
+
+    @property
     def can_be_messaged(self):
         """Returns whether this timeslot can receive messages."""
         return self.season.show.type.can_be_messaged
@@ -444,8 +488,6 @@ class Timeslot(
                 # This metadata is currently not handled at all by
                 # timeslots, so copy it all over from the show verbatim.
                 show_timeslot.image = show.image
-                show_timeslot.byline = show.byline
-                show_timeslot.credits = show.credits
 
                 # For the text metadata, it'd be nice to merge show and
                 # timeslot metadata.  Give timeslots precedence so any
@@ -490,6 +532,31 @@ class TimeslotImage(lass.metadata.models.Image):
         sqlalchemy.ForeignKey(Timeslot.id)
     )
     subject = sqlalchemy.orm.relationship(Timeslot, backref='image_entries')
+
+
+class TimeslotCredit(lass.people.models.Credit):
+    __tablename__ = 'show_season_timeslot_credit'  # Actually a view
+    __table_args__ = {'schema': 'schedule'}
+    __mapper_args__ = {'polymorphic_identity': 'timeslot', 'concrete': True}
+    id = sqlalchemy.Column(
+        'show_season_timeslot_credit_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(
+        'show_season_timeslot_id',
+        sqlalchemy.ForeignKey(Timeslot.id)
+    )
+    subject = sqlalchemy.orm.relationship(
+        Timeslot,
+        backref=sqlalchemy.orm.backref('credits', lazy='subquery')
+    )
+
+
+#
+# SIS
+#
 
 
 class Message(lass.model_base.Base):

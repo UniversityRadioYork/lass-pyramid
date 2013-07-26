@@ -12,7 +12,7 @@ import functools
 import sqlalchemy
 
 import lass.common
-import lass.people
+import lass.people.mixins
 
 
 def bulk_credits(

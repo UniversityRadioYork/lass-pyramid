@@ -36,22 +36,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sqlalchemy
 
-import lass.common
-import lass.metadata
+import lass.common.mixins
+import lass.model_base
+import lass.metadata.mixins
 import lass.people.mixins
 
 
-class URYPlayerModel(object):
+class URYPlayerModel(lass.model_base.Base):
     """Base for all schedule models."""
+    __abstract__ = True
     __table_args__ = {'schema': 'uryplayer'}
 
 
 class Podcast(
+    URYPlayerModel,
+    lass.common.mixins.Submittable,
     lass.metadata.mixins.MetadataSubject,
-    lass.people.mixins.PersonSubmittable,
-    lass.people.mixins.Creditable,
-    lass.Base,
-    URYPlayerModel
+    lass.people.mixins.Ownable
 ):
     __tablename__ = 'podcast'
     query = lass.model_base.DBSession.query_property()
@@ -74,7 +75,6 @@ class Podcast(
         """
         cls.add_meta(podcasts, 'text', 'title', 'description', 'tags')
         cls.add_meta(podcasts, 'image', 'thumbnail_image', 'player_image')
-        cls.add_credits(podcasts, with_byline_attr='byline')
 
 
 class PodcastText(lass.metadata.models.Text):
@@ -126,3 +126,20 @@ class PodcastPackageEntry(lass.metadata.models.PackageEntry):
         sqlalchemy.ForeignKey(Podcast.id)
     )
     subject = sqlalchemy.orm.relationship(Podcast, backref='package_entries')
+
+
+class PodcastCredit(lass.people.models.Credit):
+    __tablename__ = 'podcast_credit'
+    __table_args__ = {'schema': 'uryplayer'}
+    __mapper_args__ = {'polymorphic_identity': 'podcast', 'concrete': True}
+    id = sqlalchemy.Column(
+        'podcast_credit_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
+    subject_id = sqlalchemy.Column(
+        'podcast_id',
+        sqlalchemy.ForeignKey(Podcast.id)
+    )
+    subject = sqlalchemy.orm.relationship(Podcast, backref='credits')
