@@ -3,7 +3,6 @@
 import sqlalchemy
 
 import lass.model_base
-import lass.common.rdbms
 import lass.common.mixins
 import lass.people.mixins
 

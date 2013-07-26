@@ -58,6 +58,38 @@ class Transient(object):
     effective_from = effective_from_column()
     effective_to = effective_to_column()
 
+    @classmethod
+    def active_on(cls, date, transient=None):
+        """Constructs a check to filter the table 'transient' (with columns
+        'effective_from' and 'effective_to') down to only those rows active on
+        'date'.
+
+        Args:
+            date: The datetime on which the transient must be active.
+            transient: If given, the table, column set or model whose transient
+                columns will be checked; if None, the class from which this
+                method was called will be the transient.  (Default: None.)
+
+        Returns:
+            A SQLAlchemy expression implementing the transient activity check.
+        """
+        null = None  # stop static analysis checkers from moaning about == None
+
+        if transient is None:
+            transient = cls
+
+        return sqlalchemy.between(
+            date,
+            transient.effective_from,
+            sqlalchemy.case(
+                [
+                    # NULL effective_to => always on past effective_from
+                    (transient.effective_to == null, date),
+                    (transient.effective_to != null, transient.effective_to)
+                ]
+            )
+        )
+
 
 class Type(Named, Described):
     pass

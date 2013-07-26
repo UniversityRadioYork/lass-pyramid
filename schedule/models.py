@@ -270,7 +270,12 @@ class Season(
     """
     __tablename__ = 'show_season'
 
-    id = lass.common.rdbms.infer_primary_key(__tablename__)
+    id = sqlalchemy.Column(
+        'show_season_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
 
     show_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Show.id))
 
@@ -284,13 +289,53 @@ class Season(
     )
 
     @classmethod
-    def meta_sources(cls, meta_type):
+    def meta_sources(cls):
         """See 'lass.metadata.mixins.MetadataSubject.meta_sources'."""
         return [lass.metadata.query.own]
 
+    @classmethod
+    def annotate(cls, seasons):
+        """Annotates seasons with common metadata and credits information."""
+        cls.add_meta(seasons, 'text', 'title')
+
+        # Grab, in bulk, the metadata for all the shows these seasons come
+        # from.  Make sure we can get back to the seasons the shows belong
+        # to, so keep lists associated with them (we'll see why later.)
+        shows = {}
+        for season in seasons:
+            show = season.show
+            if show in shows:
+                shows[show].append(season)
+            else:
+                shows[show] = [season]
+
+        Show.annotate(list(shows.keys()))
+
+        # NB: Maybe add season metadata into the mix too, if people start
+        # giving seasons interesting names etc.  For now, shows and
+        # seasons are sufficient though.  ~Matt
+
+        # Poor man's metadata inheritance.  This used to be automatic, but
+        # doing it manually and explicitly saves a lot of complexity in the
+        # metadata system itself.
+        for show, show_seasons in shows.items():
+            for show_season in show_seasons:
+                # This metadata is currently not handled at all by
+                # seasons, so copy it all over from the show verbatim.
+                show_season.image = show.image
+
+                # For the text metadata, it'd be nice to merge show and
+                # season metadata.  Give seasons precedence so any
+                # custom episode metadata is pulled in first.
+                for key, value in show.text.items():
+                    if key in show_season.text:
+                        show_season.text[key] += value
+                    else:
+                        show_season.text[key] = value
+
 
 class SeasonText(lass.metadata.models.Text):
-    __tablename__ = 'show_season_text_metadata'
+    __tablename__ = 'season_metadata'
     __table_args__ = {'schema': 'schedule'}
     __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
     id = sqlalchemy.Column(
@@ -299,12 +344,15 @@ class SeasonText(lass.metadata.models.Text):
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Season.id))
+    subject_id = sqlalchemy.Column(
+        'show_season_id',
+        sqlalchemy.ForeignKey(Season.id)
+    )
     subject = sqlalchemy.orm.relationship(Season, backref='text_entries')
 
 
 class SeasonImage(lass.metadata.models.Image):
-    __tablename__ = 'show_season_image_metadata'
+    __tablename__ = 'season_image_metadata'
     __table_args__ = {'schema': 'schedule'}
     __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
     id = sqlalchemy.Column(
@@ -313,7 +361,10 @@ class SeasonImage(lass.metadata.models.Image):
         primary_key=True,
         nullable=False
     )
-    subject_id = sqlalchemy.Column(sqlalchemy.ForeignKey(Season.id))
+    subject_id = sqlalchemy.Column(
+        'show_season_id',
+        sqlalchemy.ForeignKey(Season.id)
+    )
     subject = sqlalchemy.orm.relationship(Season, backref='image_entries')
 
 
@@ -351,7 +402,12 @@ class Timeslot(
     """A schedule timeslot."""
     __tablename__ = 'show_season_timeslot'
 
-    id = lass.common.rdbms.infer_primary_key(__tablename__)
+    id = sqlalchemy.Column(
+        'show_season_timeslot_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
 
     season_id = sqlalchemy.Column(
         'show_season_id',
@@ -422,13 +478,6 @@ class Timeslot(
                 (lass.music.models.TrackListing.state_id == None) |
                 (~lass.music.models.TrackListing.state_id.in_(['o', 'd']))
             )
-        )
-
-    @property
-    def credits(self):
-        """Retrieves relevant credits for this timeslot."""
-        return self.season.show.credits.filter(
-            lass.common.rdbms.transient_active_on(self.start, ShowCredit)
         )
 
     @property

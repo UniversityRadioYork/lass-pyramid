@@ -131,10 +131,8 @@ class Banner(WebsiteModel):
             # Pick up banners for this location that...
             (BannerLocation.name == location) & cls.campaigns.any(
                 # ...have an active campaign running that...
-                lass.common.rdbms.transient_active_on(
-                    when,
-                    BannerCampaign.__table__
-                ) & BannerCampaign.timeslots.any(
+                BannerCampaign.active_on(when) &
+                BannerCampaign.timeslots.any(
                     # ...has a timeslot we're currently in.
                     (BannerTimeslot.day == when.isoweekday()) &
                     (BannerTimeslot.start_time <= when.time()) &

@@ -11,11 +11,6 @@ import lass.model_base
 import lass.people.mixins
 
 
-def package_foreign_key(*args, **keywords):
-    """Wrapper around 'Column' for defining a foreign key to a Package."""
-    return lass.common.rdbms.foreign_key_from(Package.id, *args, **keywords)
-
-
 class Key(lass.model_base.Base, lass.common.mixins.Type):
     """A metadata key, which defines the semantics of a piece of
     metadata.
@@ -23,7 +18,12 @@ class Key(lass.model_base.Base, lass.common.mixins.Type):
     __tablename__ = 'metadata_key'
     __table_args__ = {'schema': 'metadata'}
 
-    id = lass.common.rdbms.infer_primary_key(__tablename__)
+    id = sqlalchemy.Column(
+        'metadata_key_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
     allow_multiple = sqlalchemy.Column(
         sqlalchemy.Boolean,
         server_default='FALSE'
@@ -106,7 +106,12 @@ class Package(
     __tablename__ = 'package'
     __table_args__ = {'schema': 'metadata'}
 
-    id = lass.common.rdbms.infer_primary_key(__tablename__)
+    id = sqlalchemy.Column(
+        'package_id',
+        sqlalchemy.Integer,
+        primary_key=True,
+        nullable=False
+    )
 
     # From Type: name, description
     weight = sqlalchemy.Column('weight', sqlalchemy.Integer)

@@ -1,11 +1,11 @@
 """In which functions for composing and running metadata queries are found."""
 
+import collections
 import functools
 import itertools
 import hashlib
 import sqlalchemy
 
-import lass.common.rdbms
 import lass.metadata.models
 
 
@@ -93,14 +93,14 @@ def run(subjects, meta_type, date, sources, *keys):
 
     union = first.union(*rest).subquery()
 
-    return lass.common.rdbms.bulk_group(
+    return bulk_group(
         lass.model_base.DBSession.query(
             union.c.subject_id,
             union.c.key,
             union.c.value
         ).filter(
             (union.c.key.in_(keys)) &
-            (lass.common.rdbms.transient_active_on(date, union))
+            (lass.common.mixins.Transient.active_on(date, union.c))
         ).order_by(
             sqlalchemy.asc(union.c.subject_id),
             sqlalchemy.asc(union.c.key),
@@ -108,3 +108,45 @@ def run(subjects, meta_type, date, sources, *keys):
             sqlalchemy.desc(union.c.effective_from)
         )
     )
+
+
+def bulk_group(tuples, levels=2):
+    """Given an iterable of tuples, recursively groups the tuples into
+    dicts until the final item of each tuple is thusly grouped.
+
+    The result is a dictionary of either nested dictionaries or lists, depending
+    on when 'levels' nesting levels is reached; the lists will contain only
+    one of each element, but in the order that the tuples existed in the
+    original list.
+
+    This is most useful for assembling database results into hierarchies, for
+    example grouping metadata by subject/key or credits by subject/type.
+
+    NOTE: The grouping elements MUST be ordered.
+    """
+    assert(levels > 0)
+
+    result = collections.defaultdict(dict if levels > 1 else list)
+    grouped = itertools.groupby(tuples, lambda x: x[0])
+
+    for group, raw_groupees in grouped:
+        # The groupees still have the group as index 0 in their tuple,
+        # let's remove it and flatten the tuple if possible
+        groupees = (
+            (groupee[1] if len(groupee) == 2 else groupee[1:])
+            for groupee in raw_groupees
+        )
+        if levels > 1:
+            result[group] = bulk_group(groupees, levels=levels - 1)
+        else:
+            result[group] = remove_duplicates(groupees)
+    return result
+    
+
+def remove_duplicates(xs):
+    # Inefficient but works on non-hashables (including lists).
+    unique = []
+    for x in xs:
+        if x not in unique:
+            unique.append(x)
+    return unique
