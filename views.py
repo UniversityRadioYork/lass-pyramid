@@ -1,5 +1,6 @@
 import functools
 import pyramid
+import sqlalchemy
 
 import lass.common.config
 import lass.common.time
@@ -54,3 +55,15 @@ def standard_context(event):
             'this_page': get_page(request, current_url, website)
         }
     )
+
+
+@pyramid.view.view_config(
+    context=sqlalchemy.exc.OperationalError,
+    renderer='errors/database.jinja2'
+)
+def database_oops(exc, request):
+    """View triggered when the database falls over."""
+    return {
+        'no_database': True,
+        'exception': exc
+    }

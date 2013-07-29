@@ -31,6 +31,8 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import sqlalchemy
+
 import lass.common.time
 import lass.schedule.models
 
@@ -70,10 +72,18 @@ class State(object):
     @property
     def term(self):
         """Returns the term any active show seasons will belong to."""
-        return self._lazy(
-            'term',
-            (lambda: lass.schedule.models.Term.of(self.at_time))
-        )
+
+        try:
+            term = self._lazy(
+                'term',
+                (lambda: lass.schedule.models.Term.of(self.at_time))
+            )
+        except sqlalchemy.exc.OperationalError:
+            # Database is down, so handle this gracefully; hopefully the
+            # end result will just be the service reporting itself as down.
+            term = None
+
+        return term
 
     @property
     def can_listen(self):
@@ -161,7 +171,11 @@ def service_type(at_time=None, term=None, service_config=None):
         use_overrides = False
 
     if term is None:
-        term = lass.schedule.models.Term.of(at_time)
+        try:
+            term = lass.schedule.models.Term.of(at_time)
+        except sqlalchemy.exc.OperationalError:
+            # Database is down, handle gracefully
+            term = None
     if service_config is None:
         service_config = read_config
 
@@ -177,7 +191,8 @@ def service_type(at_time=None, term=None, service_config=None):
 
         if term is None:
             # If we can't get a term, that implies that the database hasn't been
-            # updated.  Ideally, we should make a log of this at some point.
+            # updated (or is down).  Ideally, we should make a log of this at
+            # some point.
             service_type = 'down'
         elif term.end > at_time:
             # Inside a term, which to us implies programming is happening.
