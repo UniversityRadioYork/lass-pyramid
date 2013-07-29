@@ -1,26 +1,7 @@
 """Common mixins for LASS models."""
 
 import sqlalchemy
-
-import lass.model_base
-
-
-# Column generators for inclusion in non-ORM SQL.
-# Note that these MUST be lambda'd to prevent the same column being used in
-# multiple models/tables.
-effective_from_column = lambda: sqlalchemy.Column(
-    'effective_from',
-    sqlalchemy.DateTime(timezone=True)
-)
-effective_to_column = lambda: sqlalchemy.Column(
-    'effective_to',
-    sqlalchemy.DateTime(timezone=True)
-)
-submitted_at_column = lambda: sqlalchemy.Column(
-    'submitted',
-    sqlalchemy.DateTime(timezone=True),
-    nullable=True  # Not submitted/no submission recorded
-)
+import sqlalchemy.ext.hybrid
 
 
 class Described(object):
@@ -48,14 +29,41 @@ class Named(object):
 
 class Submittable(object):
     """Mixin for models that record a submitted date."""
-    submitted_at = submitted_at_column()
+    submitted_at = sqlalchemy.Column(
+        'submitted',
+        sqlalchemy.DateTime(timezone=True),
+        nullable=True  # Not submitted/no submission recorded
+    )
 
 
 class Transient(object):
     """Mixin for models representing data with a potentially limited lifespan.
     """
-    effective_from = effective_from_column()
-    effective_to = effective_to_column()
+    effective_from = sqlalchemy.Column(
+        'effective_from',
+        sqlalchemy.DateTime(timezone=True)
+    )
+    effective_to = sqlalchemy.Column(
+        'effective_to',
+        sqlalchemy.DateTime(timezone=True)
+    )
+
+    @sqlalchemy.ext.hybrid.hybrid_property
+    def duration(self):
+        return self.effective_to - self.effective_from
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def contains(self, date):
+        """Checks whether 'date' is inside the range of this transient."""
+        null = None  # Stop static analysis from complaining about == None
+        return (
+            (self.effective_from != null) &
+            (self.effective_from <= date) &
+            (
+                (self.effective_to == null) |
+                (self.effective_to > date)
+            )
+        )
 
     @classmethod
     def active_on(cls, date, transient=None):

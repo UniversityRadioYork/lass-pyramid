@@ -32,6 +32,7 @@ import sqlalchemy
 
 import lass.model_base
 import lass.metadata.models
+import lass.metadata.query
 
 
 def search(request, model, detail_route):
@@ -59,25 +60,32 @@ def search(request, model, detail_route):
     """
     # Treat an empty term as a lack of term, and vice versa.
     term = request.params.get('term', '')
-    results = []
+    keys = request.params.getall('keys')
 
     if term:
-        pass
+        results_list = media_list(
+            request,
+            lass.metadata.query.search(term, keys, model)
+        )
+    else:
+        results_list = {}
 
     # Get the list of searchable keys for the search form.
     metadata_keys = (
         lass.model_base.DBSession.query(lass.metadata.models.Key).filter(
-            lass.metadata.models.Key.searchable == True
+            lass.metadata.models.Key.searchable
         ).order_by(
             sqlalchemy.asc(lass.metadata.models.Key.plural)
         ).all()
     )
 
-    return {
-        'term': term,
-        'results': results,
-        'metadata_keys': metadata_keys
-    }
+    return dict(
+        {
+            'term': term,
+            'metadata_keys': metadata_keys
+        },
+        **results_list
+    )
 
 
 def media_list(request, all_items):
@@ -104,19 +112,25 @@ def media_list(request, all_items):
     """
     items_per_page = 20
 
-    page = int(request.params.get('page', 1))
-    page_total = math.ceil(all_items.count() / items_per_page)
+    count = all_items.count()
+    if count:
+        page = int(request.params.get('page', 1))
+        page_total = math.ceil(all_items.count() / items_per_page)
 
-    page = max(page, 1)
-    page = min(page, page_total)
+        page = max(page, 1)
+        page = min(page, page_total)
 
-    items = all_items.slice(
-        (page - 1) * items_per_page, page * items_per_page
-    ).all()
+        items = all_items.slice(
+            (page - 1) * items_per_page, page * items_per_page
+        ).all()
 
-    # If we can, we want to sprinkle metadata on the items.
-    if items and hasattr(items[0].__class__, 'annotate'):
-        items[0].__class__.annotate(items)
+        # If we can, we want to sprinkle metadata on the items.
+        if items and hasattr(items[0].__class__, 'annotate'):
+            items[0].__class__.annotate(items)
+    else:
+        page = 0
+        page_total = 0
+        items = []
 
     return {
         'items': items,

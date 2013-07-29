@@ -57,7 +57,6 @@ class Podcast(
     lass.people.mixins.Ownable
 ):
     __tablename__ = 'podcast'
-    query = lass.model_base.DBSession.query_property()
 
     id = sqlalchemy.Column(
         'podcast_id',

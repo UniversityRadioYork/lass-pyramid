@@ -3,9 +3,9 @@
 import collections
 import functools
 import itertools
-import hashlib
 import sqlalchemy
 
+import lass.common.time
 import lass.metadata.models
 
 
@@ -141,7 +141,7 @@ def bulk_group(tuples, levels=2):
         else:
             result[group] = remove_duplicates(groupees)
     return result
-    
+
 
 def remove_duplicates(xs):
     # Inefficient but works on non-hashables (including lists).
@@ -150,3 +150,42 @@ def remove_duplicates(xs):
         if x not in unique:
             unique.append(x)
     return unique
+
+
+def search(term, keys, model, now=None):
+    """Searches for the term 'term' in the metadata keys 'keys' of 'model'.
+
+    Args:
+        term: A string to search for; at time of writing, this will be searched
+            for as a case-insensitive string fragment.
+        keys: A list of names of metadata keys in which 'term' should be
+            searched for.
+        model: The model, whose textual metadata is in 'text_entries', whose
+            metadata is to be searched and of which type the results should be.
+        now: The time at which the metadata retrieved should be active.
+            If None, the current time is used.  (Default: None.)
+
+    Returns:
+        A query returning a list of instances of 'model' for which one or more
+        items of current metadata contain 'term'.
+    """
+    if now is None:
+        now = lass.common.time.aware_now()
+ 
+    # This is needed to force the backreferences on model that point to its
+    # metadata to appear.  Any less hacky way of doing this is much appreciated.
+    _ = model()
+
+    meta = relationship_to_model(model.text_entries)
+
+    return lass.model_base.DBSession.query(
+        model
+    ).join(
+        model.text_entries
+    ).filter(
+        (meta.contains(now)) &
+        (meta.value.ilike("%{}%".format(term))) &
+        meta.key.has(lass.metadata.models.Key.name.in_(keys))
+    ).order_by(
+        meta.value
+    )
