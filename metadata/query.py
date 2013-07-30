@@ -152,7 +152,7 @@ def remove_duplicates(xs):
     return unique
 
 
-def search(term, keys, model, now=None):
+def search(term, keys, model, now=None, order='alpha'):
     """Searches for the term 'term' in the metadata keys 'keys' of 'model'.
 
     Args:
@@ -164,6 +164,8 @@ def search(term, keys, model, now=None):
             metadata is to be searched and of which type the results should be.
         now: The time at which the metadata retrieved should be active.
             If None, the current time is used.  (Default: None.)
+        order: The ordering to use; either alphabetical ('alpha') or
+            chronologically from most recent ('recent').  (Default: 'alpha'.)
 
     Returns:
         A query returning a list of instances of 'model' for which one or more
@@ -187,5 +189,5 @@ def search(term, keys, model, now=None):
         (meta.value.ilike("%{}%".format(term))) &
         meta.key.has(lass.metadata.models.Key.name.in_(keys))
     ).order_by(
-        meta.value
+        meta.value if order == 'alpha' else model.start.desc()
     )

@@ -11,17 +11,11 @@ class Described(object):
     generally you will want to use metadata for most describable items as
     Described does not implement history.
     """
-    description = sqlalchemy.Column(
-        sqlalchemy.Text,
-        nullable=False
-    )
+    description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
 class Named(object):
     """Mixin for models whose items have an internal name."""
-    name = sqlalchemy.Column(
-        sqlalchemy.String(50),
-        nullable=False
-    )
+    name = sqlalchemy.Column(sqlalchemy.String(50), nullable=False)
 
     def __str__(self):
         return self.name
@@ -35,18 +29,30 @@ class Submittable(object):
         nullable=True  # Not submitted/no submission recorded
     )
 
+    @sqlalchemy.ext.hybrid.hybrid_property
+    def start(self):
+        """Alias for 'submitted_at' for compatibility with other items which
+        have a start date.
+        """
+        return self.submitted_at
+
+    @sqlalchemy.ext.hybrid.hybrid_property
+    def duration(self):
+        return self.effective_to - self.effective_from
+
 
 class Transient(object):
     """Mixin for models representing data with a potentially limited lifespan.
     """
-    effective_from = sqlalchemy.Column(
-        'effective_from',
-        sqlalchemy.DateTime(timezone=True)
-    )
-    effective_to = sqlalchemy.Column(
-        'effective_to',
-        sqlalchemy.DateTime(timezone=True)
-    )
+    effective_from = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
+    effective_to = sqlalchemy.Column(sqlalchemy.DateTime(timezone=True))
+
+    @sqlalchemy.ext.hybrid.hybrid_property
+    def start(self):
+        """Alias for 'effective_from' for compatibility with other items which
+        have a start date.
+        """
+        return self.effective_from
 
     @sqlalchemy.ext.hybrid.hybrid_property
     def duration(self):

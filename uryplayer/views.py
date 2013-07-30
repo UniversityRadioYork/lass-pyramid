@@ -96,5 +96,5 @@ def search(request):
     return lass.common.view_helpers.search(
         request,
         lass.uryplayer.models.Podcast,
-        'uryplayer-podcast-detail' 
+        lambda id: request.route_url('uryplayer-podcast-detail', podcastid=id)
     )

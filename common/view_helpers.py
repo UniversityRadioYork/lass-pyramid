@@ -50,9 +50,8 @@ def search(request, model, detail_route):
     Args:
         request: The request sent to the view calling this function.
         model: The model through whose metadata this search is searching.
-        detail_route: The name of a route, taking a primary key belonging to an
-            object in 'model', using which "more details" links may be
-            constructed for the search results.
+        detail_route: A function that takes the ID of an item and returns an
+            URL to its details page.
 
     Returns:
         A dictionary ready to be sent through 'view_config' that represents the
@@ -60,15 +59,24 @@ def search(request, model, detail_route):
     """
     # Treat an empty term as a lack of term, and vice versa.
     term = request.params.get('term', '')
-    keys = request.params.getall('keys')
+    used_keys = request.params.getall('keys')
 
+    order = request.params.get('order', 'alpha')
+
+    query = lass.metadata.query.search(term, used_keys, model, order=order)
+
+    subtype = request.params.get('subtype', 'All Results')
+
+    results_list = {}
     if term:
-        results_list = media_list(
-            request,
-            lass.metadata.query.search(term, keys, model)
-        )
-    else:
-        results_list = {}
+        if subtype == 'First Result':
+            first_result = query.first()
+            if first_result:
+                raise pyramid.httpexceptions.HTTPFound(
+                    detail_route(first_result.id)
+                )
+        else:
+            results_list = media_list(request, query)
 
     # Get the list of searchable keys for the search form.
     metadata_keys = (
@@ -82,7 +90,9 @@ def search(request, model, detail_route):
     return dict(
         {
             'term': term,
-            'metadata_keys': metadata_keys
+            'metadata_keys': metadata_keys,
+            'used_keys': used_keys,
+            'order': order
         },
         **results_list
     )
