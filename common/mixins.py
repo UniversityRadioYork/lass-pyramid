@@ -41,6 +41,7 @@ class Described(object):
     """
     description = sqlalchemy.Column(sqlalchemy.Text, nullable=False)
 
+
 class Named(object):
     """Mixin for models whose items have an internal name."""
     name = sqlalchemy.Column(sqlalchemy.String(50), nullable=False)
