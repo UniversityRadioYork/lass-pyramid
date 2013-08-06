@@ -26,10 +26,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-import math
 import pyramid
 import sqlalchemy
 
+import lass.common.media_list
 import lass.model_base
 import lass.metadata.models
 import lass.metadata.query
@@ -59,93 +59,104 @@ def search(request, model, detail_route):
     """
     # Treat an empty term as a lack of term, and vice versa.
     term = request.params.get('term', '')
-    used_keys = request.params.getall('keys')
-
+    keys = request.params.getall('keys')
     order = request.params.get('order', 'alpha')
+    format = request.params.get('subtype', 'All Results')
 
-    query = lass.metadata.query.search(term, used_keys, model, order=order)
-
-    subtype = request.params.get('subtype', 'All Results')
-
-    results_list = {}
-    if term:
-        if subtype == 'First Result':
-            first_result = query.first()
-            if first_result:
-                raise pyramid.httpexceptions.HTTPFound(
-                    detail_route(first_result.id)
-                )
-        else:
-            results_list = media_list(request, query)
-
-    # Get the list of searchable keys for the search form.
-    metadata_keys = (
-        lass.model_base.DBSession.query(lass.metadata.models.Key).filter(
-            lass.metadata.models.Key.searchable
-        ).order_by(
-            sqlalchemy.asc(lass.metadata.models.Key.plural)
-        ).all()
-    )
+    source = lass.metadata.query.search(term, keys, model, order=order)
+    results = perform_search(request, source, format, detail_route)
 
     return dict(
         {
             'term': term,
-            'metadata_keys': metadata_keys,
-            'used_keys': used_keys,
+            'metadata_keys': lass.metadata.query.searchable_keys(),
+            'used_keys': keys,
             'order': order
         },
-        **results_list
+        **results
     )
 
 
-def media_list(request, all_items):
-    """Implements a generic list view function.
-
-    Given a SQLAlchemy query result and the request that triggered this view
-    render, this function will return the appropriate view context dictionary
-    for a list page.
-
-    The view takes one GET parameter, 'page', which defaults to 1 and represents
-    the page the user wishes to load, with 1 being the first page.  Any page
-    requested outside the range 1-(maximum page needed to show 'items') will be
-    clamped to the appropriate bound.
+def perform_search(request, source, format, detail_route):
+    """Performs a search from a query and formats its results.
 
     Args:
         request: The request sent to the view calling this function.
-        all_items: A query retrieving ALL items to display on this list IN ORDER
-            OF DISPLAY.  (This will be sliced down to the correct range for the
-            page itself.)
+        source: The query representing the source of results for this
+            search.
+        format: A string naming the format in which the results should
+            be provided.  Currently this may be 'All Results', in which
+            case the results are returned as a media list, or 'First 
+            Result', in which case the first result's detail page is
+            redirected to via 'detail_route'.  The case of there being
+            no results is handled identically for both.
+        detail_route: A function taking the ID of a search result and
+            returning the URL of its details page.
 
     Returns:
-        A dictionary ready to be sent through 'view_config' that represents the
-        view context for the list renderer.
+        A dict providing the contributions of the search results to the 
+        view's template context; the returned dict should be merged
+        into that returned by its calling view.
+
+    Raises:
+        HTTPFound: This is raised when 'First Result' is specified and
+            a result has indeed been found.
+        ValueError: This is raised if the format is unrecognised.
     """
+    context = {}
+
+    if source:
+        if format == 'First Result':
+            first_result = source.first()
+            if first_result:
+                raise pyramid.httpexceptions.HTTPFound(
+                    detail_route(first_result.id)
+                )
+        elif format == 'All Results':
+            context = media_list(request, source)
+        else:
+            raise ValueError('Unknown search format {}.'.format(format))
+
+    return context
+
+
+def media_list(request, source):
+    """Implements a generic list view function.
+
+    Given a SQLAlchemy query result and the request that triggered this
+    view render, this function will return the appropriate view context
+    dictionary for a list page.
+
+    The view takes one GET parameter, 'page', which defaults to 1 and
+    represents the page the user wishes to load, with 1 being the first
+    page.  Any page requested outside the range 1-(maximum page needed
+    to show 'items') will be clamped to the appropriate bound.
+
+    Args:
+        request: The request sent to the view calling this function.
+        source: An unevaluated SQLAlchemy ORM query representing the
+            source of all items in this list, in the order in which
+            they should appear in the list.
+
+    Returns:
+        A dictionary ready to be sent through 'view_config' that
+        represents the view context for the list renderer.
+    """
+
     items_per_page = 20
 
-    count = all_items.count()
-    if count:
-        page = int(request.params.get('page', 1))
-        page_total = math.ceil(all_items.count() / items_per_page)
-
-        page = max(page, 1)
-        page = min(page, page_total)
-
-        items = all_items.slice(
-            (page - 1) * items_per_page, page * items_per_page
-        ).all()
-
-        # If we can, we want to sprinkle metadata on the items.
-        if items and hasattr(items[0].__class__, 'annotate'):
-            items[0].__class__.annotate(items)
-    else:
-        page = 0
-        page_total = 0
-        items = []
+    page_total = lass.common.media_list.page_total(source, items_per_page)
+    page_number = lass.common.media_list.page_number(request, page_total)
+    items = items = lass.common.media_list.page_contents(
+        source,
+        items_per_page,
+        page_number
+    )
 
     return {
         'items': items,
-        'pages': page_total,
-        'page': page
+        'page': page_number,
+        'pages': page_total
     }
 
 

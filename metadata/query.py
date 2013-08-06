@@ -29,18 +29,7 @@ def own(subjects, meta_type, priority):
     if meta_entries is not None:
         meta_model = relationship_to_model(meta_entries)
 
-        query = lass.model_base.DBSession.query(
-            lass.metadata.models.Key.name.label('key'),
-            meta_model.value.label('value'),
-            meta_model.effective_from.label('effective_from'),
-            meta_model.effective_to.label('effective_to'),
-            meta_model.subject_id.label('subject_id'),
-            sqlalchemy.literal(priority).label('priority')
-        ).select_from(
-            meta_model
-        ).join(
-            lass.metadata.models.Key
-        ).filter(
+        query = all_metadata(meta_model, priority).filter(
             meta_model.subject_id.in_([subject.id for subject in subjects])
         )
     else:
@@ -58,18 +47,8 @@ def package(subjects, meta_type, priority):
         package_entry_model = relationship_to_model(package_entries)
         meta_model = relationship_to_model(package_meta_entries)
 
-        query = lass.model_base.DBSession.query(
-            lass.metadata.models.Key.name.label('key'),
-            meta_model.value.label('value'),
-            meta_model.effective_from.label('effective_from'),
-            meta_model.effective_to.label('effective_to'),
-            meta_model.subject_id.label('subject_id'),
-            sqlalchemy.literal(priority).label('priority')
-        ).select_from(
-            meta_model
-        ).join(
+        query = all_metadata(meta_model, priority).join(
             package_entry_model.package,
-            lass.metadata.models.Key
         ).filter(
             package_entry_model.subject_id.in_(
                 [subject.id for subject in subjects]
@@ -79,6 +58,36 @@ def package(subjects, meta_type, priority):
         query = None
     return query
 
+
+def all_metadata(meta_model, priority):
+    """Creates a query pulling all metadata from a metadata model.
+
+    This query can be used as the base for more refined metadata
+    queries.
+
+    Args:
+        meta_model: The model containing the metadata.
+        priority: An integer representing the priority of this metadata
+            source in a metadata query (lower numbers are considered
+            before higher ones).
+
+    Returns:
+        A query returning all metadata in 'meta_model', in the form
+        (key name, value, effective from, effective to, subject ID,
+        priority).
+    """
+    return lass.model_base.DBSession.query(
+        lass.metadata.models.Key.name.label('key'),
+        meta_model.value.label('value'),
+        meta_model.effective_from.label('effective_from'),
+        meta_model.effective_to.label('effective_to'),
+        meta_model.subject_id.label('subject_id'),
+        sqlalchemy.literal(priority).label('priority')
+    ).select_from(
+        meta_model
+    ).join(
+        lass.metadata.models.Key
+    )
 
 def run(subjects, meta_type, date, sources, *keys):
     # Metadata is currently held in a relational database.
@@ -153,11 +162,11 @@ def remove_duplicates(xs):
 
 
 def search(term, keys, model, now=None, order='alpha'):
-    """Searches for the term 'term' in the metadata keys 'keys' of 'model'.
+    """Constructs a metadata search query.
 
     Args:
-        term: A string to search for; at time of writing, this will be searched
-            for as a case-insensitive string fragment.
+        term: A string to search for; at time of writing, this will be
+            searched for as a case-insensitive string fragment.
         keys: A list of names of metadata keys in which 'term' should be
             searched for.
         model: The model, whose textual metadata is in 'text_entries', whose
@@ -168,8 +177,11 @@ def search(term, keys, model, now=None, order='alpha'):
             chronologically from most recent ('recent').  (Default: 'alpha'.)
 
     Returns:
-        A query returning a list of instances of 'model' for which one or more
-        items of current metadata contain 'term'.
+        A query returning a list of instances of 'model' for which one
+        or more items of current metadata contain 'term', or None if
+        there is not enough information available for a search (either
+        'term' was empty, or no 'keys' were provided).
+
     """
     if now is None:
         now = lass.common.time.aware_now()
@@ -180,14 +192,40 @@ def search(term, keys, model, now=None, order='alpha'):
 
     meta = relationship_to_model(model.text_entries)
 
+    if term and keys:
+        query = lass.model_base.DBSession.query(
+            model
+        ).join(
+            model.text_entries
+        ).filter(
+            (meta.contains(now)) &
+            (meta.value.ilike("%{}%".format(term))) &
+            meta.key.has(lass.metadata.models.Key.name.in_(keys))
+        ).order_by(
+            meta.value if order == 'alpha' else model.start.desc()
+        )
+
+        assert query is not None, 'Got None for a query with term and keys.'
+    else:
+        query = None
+
+    return query
+
+
+def searchable_keys():
+    """Finds all metadata keys that should be available for searching.
+
+    This function costs one database query per run.
+
+    Returns:
+        A list of metadata keys, in alphabetical order by their plural
+        name, that are allowed to be specified as fields in a metadata
+        based search.
+    """
     return lass.model_base.DBSession.query(
-        model
-    ).join(
-        model.text_entries
+        lass.metadata.models.Key
     ).filter(
-        (meta.contains(now)) &
-        (meta.value.ilike("%{}%".format(term))) &
-        meta.key.has(lass.metadata.models.Key.name.in_(keys))
+        lass.metadata.models.Key.searchable
     ).order_by(
-        meta.value if order == 'alpha' else model.start.desc()
-    )
+        sqlalchemy.asc(lass.metadata.models.Key.plural)
+    ).all()
