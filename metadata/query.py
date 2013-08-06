@@ -1,4 +1,32 @@
-"""In which functions for composing and running metadata queries are found."""
+"""Functions for composing and running metadata queries and searches.
+
+---
+
+Copyright (c) 2013, University Radio York.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
 
 import collections
 import functools
@@ -10,8 +38,8 @@ import lass.metadata.models
 
 
 def relationship(model, type):
-    """Returns the model's relationship to a given attached metadata type, or
-    None if none exists.
+    """Returns the model's relationship to a given attached metadata
+    type, or None if none exists.
     """
     return getattr(model, type + '_entries', None)
 
@@ -22,8 +50,9 @@ def relationship_to_model(rel):
 
 
 def own(subjects, meta_type, priority):
-    """Queries for all metadata attached to a given set of subjects, for a
-    given type of metadata."""
+    """Queries for all metadata attached to a given set of subjects, for
+    a given type of metadata.
+    """
     meta_entries = relationship(subjects[0].__class__, meta_type)
 
     if meta_entries is not None:
@@ -38,8 +67,10 @@ def own(subjects, meta_type, priority):
 
 
 def package(subjects, meta_type, priority):
-    """Queries for all metadata attached to a given set of subjects, for a
-    given type of metadata and indirected through the metadata package layer."""
+    """Queries for all metadata attached to a given set of subjects, for
+    a given type of metadata and indirected through the metadata package
+    layer.
+    """
     package_entries = relationship(subjects[0].__class__, 'package')
     package_meta_entries = relationship(lass.metadata.models.Package, meta_type)
 
@@ -123,13 +154,14 @@ def bulk_group(tuples, levels=2):
     """Given an iterable of tuples, recursively groups the tuples into
     dicts until the final item of each tuple is thusly grouped.
 
-    The result is a dictionary of either nested dictionaries or lists, depending
-    on when 'levels' nesting levels is reached; the lists will contain only
-    one of each element, but in the order that the tuples existed in the
-    original list.
+    The result is a dictionary of either nested dictionaries or lists,
+    depending on when 'levels' nesting levels is reached; the lists will
+    contain only one of each element, but in the order that the tuples
+    existed in the original list.
 
-    This is most useful for assembling database results into hierarchies, for
-    example grouping metadata by subject/key or credits by subject/type.
+    This is most useful for assembling database results into
+    hierarchies, for example grouping metadata by subject/key or credits
+    by subject/type.
 
     NOTE: The grouping elements MUST be ordered.
     """
@@ -169,12 +201,14 @@ def search(term, keys, model, now=None, order='alpha'):
             searched for as a case-insensitive string fragment.
         keys: A list of names of metadata keys in which 'term' should be
             searched for.
-        model: The model, whose textual metadata is in 'text_entries', whose
-            metadata is to be searched and of which type the results should be.
+        model: The model, whose textual metadata is in 'text_entries',
+            whose metadata is to be searched and to which type the
+            results should belong.
         now: The time at which the metadata retrieved should be active.
             If None, the current time is used.  (Default: None.)
         order: The ordering to use; either alphabetical ('alpha') or
-            chronologically from most recent ('recent').  (Default: 'alpha'.)
+            chronologically from most recent ('recent').
+            (Default: 'alpha'.)
 
     Returns:
         A query returning a list of instances of 'model' for which one

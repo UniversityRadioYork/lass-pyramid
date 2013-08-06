@@ -1,7 +1,7 @@
 """Models for the metadata system.
 
-In addition to these, the metadata system infers and uses per-model database
-tables for retrieving metadata.  See 'metadata.rdbms' for more information.
+In addition to these, the metadata system infers and uses per-model
+database tables for retrieving metadata.
 """
 
 import sqlalchemy
@@ -144,13 +144,15 @@ class Package(
 
 
 class PackageAttachable(MetadataModel):
-    """Base class for all models defining an attachable bound to packages."""
+    """Base class for all models defining an attachable bound to
+    packages."""
     __abstract__ = True
     __mapper_args__ = {'polymorphic_identity': 'package', 'concrete': True}
 
     subject_id_field = 'package_id'
     subject_id_target = Package.id
-    subject_target = Package 
+    subject_target = Package
+
 
 class PackageText(PackageAttachable, Text):
     __tablename__ = 'package_text_metadata'
