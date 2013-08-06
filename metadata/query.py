@@ -120,6 +120,7 @@ def all_metadata(meta_model, priority):
         lass.metadata.models.Key
     )
 
+    
 def run(subjects, meta_type, date, sources, *keys):
     # Metadata is currently held in a relational database.
     # It would be spiffing to change this
