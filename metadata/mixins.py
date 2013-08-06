@@ -1,6 +1,32 @@
 """In which a mixin that allows attached metadata on a model to be
 accessed in a common manner is described.
 
+---
+
+Copyright (c) 2013, University Radio York.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import collections
@@ -24,7 +50,7 @@ class MetadataSubject(object):
         This is a bulk metadata query operation (one metadata query per call).
 
         Args:
-            items: The items to annotate.  These MUST be instances of 'cls'. 
+            items: The items to annotate.  These MUST be instances of 'cls'.
             meta_type: The metadata type to fetch from, for example 'text' or
                 'image'.
             *keys: The metadata key names to fetch metadata for.  If no keys are
@@ -44,13 +70,14 @@ class MetadataSubject(object):
     @classmethod
     def meta_sources(cls):
         """
-        Given a metadata type, returns an iterable of sources for that type.
+        Given a metadata type, returns an iterable of sources for that
+        type.
 
-        These are SQLAlchemy SELECT queries that return metadata, prioritised
-        in order of appearance in the list.
+        These are SQLAlchemy SELECT queries that return metadata,
+        prioritised in order of appearance in the list.
 
-        The list is *not* flattened out - use list concatenation or appending
-        to include more lists.
+        The list is *not* flattened out - use list concatenation or
+        appending to include more lists.
 
         See 'metadata.query' for helper functions to construct sources.
         """
