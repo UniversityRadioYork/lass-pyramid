@@ -1,30 +1,40 @@
-"""The filler module provides functions for manipulating and
-inserting filler slots.
+"""The schedule filler system.
 
-Filler slots are fake timeslots, tied to a fake season (which is
-assigned to a real show), that are optionally used to pad out gaps
-in timeslot ranges.
+Filling is the process of converting a list of scheduled timeslots which
+may contain gaps into a continuous, gapless list; gaps are removed by
+adding phony "filler" timeslots, which represent times where the station
+is broadcasting sustainer programming.
 
-This allows functions further up the chain to work with the
-assumption that timeslot ranges are contiguous (that is, there are
-no gaps between one timeslot's end and another timeslot's start).
+The filler show is not stored in any form of database, but is instead
+configured directly from a sitewide configuration file, "filler.yml".
+This contains the filler show's metadata, amongst other things.
 
-Branding filler shows
-=====================
+---
 
-At the time of writing, the filler slots correspond to URY Jukebox
-programming, but the filler show is stored in the show database
-as an actual show and thus the branding of the filler programming may
-vary via the show metadata system.
+Copyright (c) 2013, University Radio York.
+All rights reserved.
 
-Defining the filler show
-========================
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
 
-The filler show must exist in the database as the only show with the
-show type named 'filler'.
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
 
-.. WARNING:
-   This show type obviously must also exist.
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import datetime
@@ -40,8 +50,9 @@ ZERO = datetime.timedelta(seconds=0)
 class FillerTimeslot(lass.schedule.models.BaseTimeslot):
     """An object representing a filler timeslot.
 
-    Filler timeslots are mostly compatible with regular timeslots, but have
-    pre-applied "fake" metadata, and have no attached seasons or shows.
+    Filler timeslots are mostly compatible with regular timeslots, but
+    have pre-applied "fake" metadata, and have no attached seasons or
+    shows.
     """
     is_filler = True
     is_collapsible = True
