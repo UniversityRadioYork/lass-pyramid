@@ -131,7 +131,7 @@ def name_block_for_timeslot(timeslot, block_config):
         or otherwise the name of the name block in which this timeslot
         resides.
     """
-    name_block = next(
+    return next(
         (
             block for pattern, block in block_config['name_blocks']
             if name_block_match(timeslot, pattern)

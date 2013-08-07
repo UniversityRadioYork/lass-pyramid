@@ -29,6 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import functools
+import operator
 import unittest.mock
 
 import lass.common.time
@@ -72,6 +73,53 @@ TEST_BLOCK_CONFIG = {
 #
 # lass.schedule.blocks
 #
+
+
+def test_name_block_for_timeslot():
+    """Tests 'lass.schedule.block.name_block_for_timeslot'."""
+    timeslot = unittest.mock.MagicMock()
+
+    block = lambda timeslot: (
+        lass.schedule.blocks.name_block_for_timeslot(
+            timeslot,
+            TEST_BLOCK_CONFIG
+        )
+    )
+    set_title = lambda timeslot, title: operator.setitem(
+        timeslot.text['title'],
+        0,
+        title
+    )
+    timeslot.text = {'title': ['blank']}
+
+    set_title(timeslot, 'explicit name')
+    assert block(timeslot) == 'Test1', 'Explicit name matching failed.'
+
+    set_title(timeslot, 'EXPLICIT NAME')
+    assert block(timeslot) == 'Test1', 'Case is incorrectly sensitive.'
+
+    set_title(timeslot, 'start test')
+    assert block(timeslot) == 'Test2', 'Start-of-name matching failed.'
+
+    set_title(timeslot, 'test finish')
+    assert block(timeslot) == 'Test3', 'Finish-of-name matching failed.'
+
+    set_title(timeslot, 'include middle test')
+    assert block(timeslot) == 'Test1', 'Middle-of-name matching failed.'
+
+    set_title(timeslot, 'exclude middle test')
+    assert block(timeslot) is None, 'Exclusion rule ignored.'
+
+    for i in range(0, 10):
+        set_title(timeslot, 'range{}'.format(i))
+        assert block(timeslot) == 'Test2', 'Character class matching failed.'
+
+    set_title(timeslot, 'not a matched title')
+    assert block(timeslot) is None, 'Fall-through failed.'
+
+    set_title(timeslot, '')
+    assert block(timeslot) is None, 'Empty string incorrectly matched.'
+
 
 def test_name_block_match():
     """Tests 'lass.schedule.block.name_block_match'."""
