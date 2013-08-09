@@ -60,9 +60,16 @@ def contact(_):
 )
 def home(_):
     """The view for the index page."""
-    return {
+    context = {
         'banners': lass.website.models.Banner.for_location('index')
     }
+
+    for view in [
+        box_podcast_raw
+        # TODO: More
+    ]:
+        context.update(view())
+    return context
 
 
 @pyramid.view.notfound_view_config(
@@ -73,3 +80,25 @@ def not_found(request, *_):
     request.response.status = '404 Not Found'
 
     return {}
+
+
+#
+# Box views
+#
+# These come in two flavours: the "actual" view that renders the box
+# fully, and the "raw" view that merely returns the template context
+# the actual view uses.
+#
+# The latter is for serving for AJAX and iframes; the former is for
+# merging into the home() view's context directly.
+#
+
+
+def box_podcast_raw():
+    """Raw view for the home page's podcasts box."""
+    podcasts = lass.uryplayer.views.podcast_list_query()[:5]
+    lass.uryplayer.models.Podcast.annotate(podcasts)
+
+    return {
+        'podcasts': podcasts
+    }

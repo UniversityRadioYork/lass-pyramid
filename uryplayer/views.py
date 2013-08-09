@@ -55,16 +55,7 @@ def uryplayer(request):
 )
 def podcasts(request):
     """Displays a list of podcasts."""
-    return lass.common.view_helpers.media_list(
-        request,
-        lass.model_base.DBSession.query(
-            lass.uryplayer.models.Podcast
-        ).options(
-            sqlalchemy.orm.subqueryload('credits')
-        ).order_by(
-            sqlalchemy.desc(lass.uryplayer.models.Podcast.submitted_at)
-        )
-    )
+    return lass.common.view_helpers.media_list(request, podcast_list_query())
 
 
 @pyramid.view.view_config(
@@ -97,4 +88,19 @@ def search(request):
         request,
         lass.uryplayer.models.Podcast,
         lambda id: request.route_url('uryplayer-podcast-detail', podcastid=id)
+    )
+
+
+#
+# Helper functions
+#
+
+def podcast_list_query():
+    """Returns the query that should be used to make a podcast list."""
+    return lass.model_base.DBSession.query(
+        lass.uryplayer.models.Podcast
+    ).options(
+        sqlalchemy.orm.subqueryload('credits')
+    ).order_by(
+        sqlalchemy.desc(lass.uryplayer.models.Podcast.submitted_at)
     )
