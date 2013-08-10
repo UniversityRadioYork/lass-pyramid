@@ -1,5 +1,6 @@
 import datetime
 import functools
+import operator
 import pyramid
 import sqlalchemy
 
@@ -15,7 +16,7 @@ def shows(request):
     """Displays a list of shows."""
     return lass.common.view_helpers.media_list(
         request,
-        lass.schedule.models.Show.in_showdb(
+        lass.schedule.models.Show.public(
         ).filter(
             # Only show scheduled shows.
             lass.schedule.models.Show.seasons.any(
@@ -48,7 +49,7 @@ def show_detail(request):
             sqlalchemy.orm.joinedload('seasons', 'timeslots'),
             sqlalchemy.orm.joinedload('credits')
         ),
-        constraint=lambda show: show.type.has_showdb_entry,
+        constraint=operator.attrgetter('type.is_public'),
         target_name='show'
     )
 
@@ -71,7 +72,7 @@ def season_detail(request):
         ).options(
             sqlalchemy.orm.joinedload('timeslots'),
         ),
-        constraint=lambda season: season.show.type.has_showdb_entry,
+        constraint=operator.attrgetter('show.type.is_public'),
         target_name='season'
     )
 
@@ -90,7 +91,7 @@ def timeslot_detail(request):
         ).options(
             sqlalchemy.orm.joinedload('credits'),
         ),
-        constraint=lambda timeslot: timeslot.season.show.type.has_showdb_entry,
+        constraint=operator.attrgetter('season.show.type.is_public'),
         target_name='timeslot'
     )
 

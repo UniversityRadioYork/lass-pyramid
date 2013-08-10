@@ -77,10 +77,6 @@ class ShowType(
         sqlalchemy.Boolean,
         server_default='TRUE'
     )
-    has_showdb_entry = sqlalchemy.Column(
-        sqlalchemy.Boolean,
-        server_default='TRUE'
-    )
     is_collapsible = sqlalchemy.Column(
         sqlalchemy.Boolean,
         server_default='FALSE'
@@ -122,7 +118,6 @@ class Show(
         'submitted',
         sqlalchemy.DateTime(timezone=True)
     )
-
     seasons = sqlalchemy.orm.relationship(
         'Season',
         backref=sqlalchemy.orm.backref('show', lazy='joined'),
@@ -139,11 +134,6 @@ class Show(
         ).options(
             sqlalchemy.orm.contains_eager('type')
         ).filter(ShowType.is_public)
-
-    @classmethod
-    def in_showdb(cls):
-        """Retrieves a Query of all shows in the Show Database."""
-        return cls.public().filter(ShowType.has_showdb_entry)
 
     @classmethod
     def meta_sources(cls):
