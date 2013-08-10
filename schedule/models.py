@@ -320,7 +320,7 @@ class SeasonAttachable(ScheduleModel):
     __abstract__ = True
     __mapper_args__ = {'polymorphic_identity': 'season', 'concrete': True}
 
-    subject_id_field = 'season_id'
+    subject_id_field = 'show_season_id'
     subject_id_target = Season.id
     subject_target = Season
 
