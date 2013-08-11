@@ -1,4 +1,5 @@
 import functools
+import operator
 import pyramid
 import sqlalchemy
 
@@ -29,6 +30,26 @@ def get_page(request, current_url, website):
     return dict(page, title=title)
 
 
+def get_streams(website):
+    """Returns a list of all streams on the website.
+
+    Args:
+        website: The main website configuration dictionary.
+
+    Returns:
+        A list of dictionaries with keys 'name', 'mount', 'format' and
+        'kbps', ordered in descending quality (kbps).
+    """
+    return sorted(
+        (
+            dict(value, name=key)
+            for key, value in website['streams'].items()
+        ),
+        key=operator.itemgetter('kbps'),
+        reverse=True
+    )
+
+
 @pyramid.events.subscriber(pyramid.events.BeforeRender)
 def standard_context(event):
     request = event['request']
@@ -52,7 +73,8 @@ def standard_context(event):
             'website': website,
             'raw_url': lambda r: request.route_url('home') + r,
             'current_url': current_url,
-            'this_page': get_page(request, current_url, website)
+            'this_page': get_page(request, current_url, website),
+            'streams': get_streams(website)
         }
     )
 
@@ -61,7 +83,7 @@ def standard_context(event):
     context=sqlalchemy.exc.OperationalError,
     renderer='errors/database.jinja2'
 )
-def database_oops(exc, request):
+def database_oops(exc, _):
     """View triggered when the database falls over."""
     return {
         'no_database': True,
