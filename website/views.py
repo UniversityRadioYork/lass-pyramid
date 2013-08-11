@@ -38,6 +38,10 @@ import lass.website.models
     renderer='website/about.jinja2'
 )
 @pyramid.view.view_config(
+    route_name='getinvolved',
+    renderer='website/getinvolved.jinja2'
+)
+@pyramid.view.view_config(
     route_name='listen',
     renderer='website/listen.jinja2'
 )
@@ -61,7 +65,7 @@ def contact(_):
 )
 def home(_):
     """The view for the index page."""
-    context = {
+    return {
         'banners': lass.website.models.Banner.for_location('index')
     }
 
