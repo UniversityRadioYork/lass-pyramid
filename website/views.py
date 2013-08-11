@@ -65,7 +65,7 @@ def contact(_):
 )
 def home(_):
     """The view for the index page."""
-    return {
+    context = {
         'banners': lass.website.models.Banner.for_location('index')
     }
 
@@ -78,7 +78,6 @@ def home(_):
     ]:
         context.update(view())
     return context
-
 
 @pyramid.view.notfound_view_config(
     renderer='errors/404.jinja2',
