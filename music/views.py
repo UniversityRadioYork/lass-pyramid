@@ -37,9 +37,7 @@ import lass.music.models
 )
 def chart(request):
     """The main URY Chart page view."""
-    return {
-        'chart': lass.music.models.Chart.latest('chart')
-    }
+    return generic_chart('chart')
 
 
 @pyramid.view.view_config(
@@ -48,6 +46,11 @@ def chart(request):
 )
 def recommended(request):
     """The Recommended Music list page view."""
+    return generic_chart('music')
+
+
+def generic_chart(chart_name):
+    """View helper for making a view that returns a URY music chart."""
     return {
-        'music': lass.music.models.Chart.latest('music')
+        chart_name: lass.music.models.Chart.latest(chart_name)
     }

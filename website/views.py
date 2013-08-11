@@ -26,6 +26,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import functools
 import pyramid
 
 import lass.common.config
@@ -65,8 +66,11 @@ def home(_):
     }
 
     for view in [
-        box_podcast_raw
-        # TODO: More
+        box_podcast_raw,
+        box_chart_raw,
+        box_recommended_raw,
+        box_news_raw,
+        box_speech_raw
     ]:
         context.update(view())
     return context
@@ -92,6 +96,27 @@ def not_found(request, *_):
 # The latter is for serving for AJAX and iframes; the former is for
 # merging into the home() view's context directly.
 #
+
+
+def box_chart_raw():
+    """Raw view for the home page's charts box."""
+    return lass.music.views.generic_chart('chart')
+
+
+def box_recommended_raw():
+    """Raw view for the home page's Recommended Listening box."""
+    return lass.music.views.generic_chart('music')
+
+
+def box_team_blog_raw(blog_name):
+    """Raw view for the home page's team blog boxes."""
+    return {
+        blog_name: lass.teams.views.blog(blog_name)
+    }
+
+
+box_news_raw = functools.partial(box_team_blog_raw, 'news')
+box_speech_raw = functools.partial(box_team_blog_raw, 'speech')
 
 
 def box_podcast_raw():
