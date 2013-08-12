@@ -165,13 +165,8 @@ def from_to(source, start, finish):
         'start' and 'finish'.
     """
     return source.filter(
-        (lass.schedule.models.Timeslot.start <= finish) &
-        (
-            (
-                lass.schedule.models.Timeslot.start +
-                lass.schedule.models.Timeslot.duration
-            ) > start
-        )
+        (start < lass.schedule.models.Timeslot.finish) &
+        (lass.schedule.models.Timeslot.start < finish)
     ).options(
         sqlalchemy.orm.subqueryload('season', 'show', 'credits')
     ).order_by(
@@ -199,10 +194,7 @@ def next(source, start, finish, count):
         to occur from 'start' (or now if 'from' is None).
     """
     return source.filter(
-        (
-            lass.schedule.models.Timeslot.start +
-            lass.schedule.models.Timeslot.duration
-        ) > start
+        start < lass.schedule.models.Timeslot.finish
     ).options(
         sqlalchemy.orm.subqueryload('season', 'show', 'credits')
     ).order_by(
