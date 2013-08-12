@@ -148,7 +148,7 @@ class Show(
         Args:
             shows: A list of shows to annotate in-place.
         """
-        cls.add_meta(shows, 'text', 'title', 'description', 'tags')
+        cls.add_meta(shows, 'text', 'title', 'description', 'tag')
         cls.add_meta(shows, 'image', 'image', 'thumbnail_image', 'player_image')
 
 
