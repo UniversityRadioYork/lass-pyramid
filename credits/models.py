@@ -59,6 +59,14 @@ class CreditType(lass.model_base.Base, lass.common.mixins.Named):
         server_default='FALSE'
     )
 
+    def __lt__(self, other):
+        """Determines whether this credit type is less than another.
+
+        This method is implemented so that types can be sorted by name
+        directly.
+        """
+        return self.name < other.name
+
 
 class Credit(lass.metadata.models.Attachable):
     """Abstract model for credits, to be extended for each creditable."""
