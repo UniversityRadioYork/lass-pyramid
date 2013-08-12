@@ -31,6 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 import sqlalchemy
 import sqlalchemy.ext.hybrid
 
+import lass.common.time
+
 
 class Described(object):
     """Mixin for models whose items have a description.
@@ -65,10 +67,6 @@ class Submittable(object):
         """
         return self.submitted_at
 
-    @sqlalchemy.ext.hybrid.hybrid_property
-    def duration(self):
-        return self.effective_to - self.effective_from
-
 
 class Transient(object):
     """Mixin for models representing data with a potentially limited lifespan.
@@ -88,17 +86,79 @@ class Transient(object):
         return self.effective_to - self.effective_from
 
     @sqlalchemy.ext.hybrid.hybrid_method
-    def contains(self, date):
-        """Checks whether 'date' is inside the range of this transient."""
+    def active_in_range(self, start, finish):
+        """Checks whether this transient was active at any point
+        between 'start' and 'finish'.
+        """
         null = None  # Stop static analysis from complaining about == None
         return (
-            (self.effective_from != null) &
-            (self.effective_from <= date) &
-            (
-                (self.effective_to == null) |
-                (self.effective_to > date)
-            )
+            self.started_by(finish) & self.not_finished_by(start)
+       )
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def contains(self, date):
+        """Checks whether 'date' is inside the range of this transient."""
+        return (
+            self.started_by(date) & self.not_finished_by(date)
         )
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def started_by(self, date):
+        """Is true when a transient has become effective on or before
+        the given date.
+        """
+        return (self.effective_from is not None) or self.effective_from <= date
+
+    @started_by.expression
+    def started_by(cls, date):
+        """The SQL expression version of 'started_by'."""
+        null = None  # Stop static analysis from complaining about == None
+        return (cls.effective_from != null) & (cls.effective_from <= date)
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def not_finished_by(self, date):
+        """Is true if a transient has not stopped becoming effective on
+        or after the given date.
+        """
+        # Must be separate because | doesn't short-circuit.
+        return (self.effective_to is None) or date <= self.effective_to
+
+    @not_finished_by.expression
+    def not_finished_by(cls, date):
+        """The SQL expression version of 'not_finished_by'."""
+        null = None  # Stop static analysis from complaining about == None
+        return (cls.effective_to == null) | (date <= cls.effective_to)
+
+
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def contains_submitted_at(self, _):
+        """Checks whether this transient is active for an object whose
+        submission date is 'submitted_at'.
+        """
+        null = None  # Stop static analysis from complaining about == None
+
+        # Ignore the submission date, because at the moment an active
+        # transient on a submission date is one that is currently
+        # active with respect to now.
+        return self.not_finished_by(lass.common.time.aware_now())
+
+    @sqlalchemy.ext.hybrid.hybrid_method
+    def contains_object(self, object):
+        """Checks an arbitrary object to see if it fits inside the
+        range of this transient.
+        """
+        # Try a multitude of methods to figure out the appropriate
+        # way of comparing this object.
+
+        if hasattr(object, 'submitted_at'):
+            cmp = self.contains_submitted_at(object.submitted_at)
+        elif hasattr(object, 'start') and hasattr(object, 'finish'):
+            cmp = self.active_in_range(object.start, object.finish)
+        else:
+            cmp = True
+        return cmp
+
 
     @classmethod
     def active_on(cls, date, transient=None):

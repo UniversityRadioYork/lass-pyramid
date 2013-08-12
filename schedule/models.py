@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import sqlalchemy
+import sqlalchemy.ext.hybrid
 
 import lass.common
 import lass.metadata
@@ -341,12 +342,12 @@ class BaseTimeslot(object):
         self.start = start
         self.duration = duration
 
-    @property
+    @sqlalchemy.ext.hybrid.hybrid_property
     def finish(self):
         """Returns the datetime of the end of this timeslot."""
         return self.start + self.duration
 
-    @property
+    @sqlalchemy.ext.hybrid.hybrid_property
     def start_date(self):
         """Returns the start date (sans time) of the timeslot."""
         return self.start.date()
@@ -508,6 +509,21 @@ class Timeslot(
                         show_timeslot.text[key] = value
         lass.schedule.blocks.annotate(timeslots)
 
+    @property
+    def credits(self):
+        """Fake credits property.
+
+        Timeslots don't have their own credits, and instead just use
+        those of their parent shows.
+        """
+        if not hasattr(self, '_credits'):
+            self._credits = (
+                credit
+                for credit in self.season.show.credits
+                if credit.contains_object(self)
+            )
+        return self._credits
+
 
 class TimeslotAttachable(ScheduleModel):
     """Base class for all models defining an attachable bound to Timeslots."""
@@ -529,9 +545,9 @@ class TimeslotImage(TimeslotAttachable, lass.metadata.models.Image):
     primary_key_field = 'timeslot_image_metadata_id'
 
 
-class TimeslotCredit(TimeslotAttachable, lass.credits.models.Credit):
-    __tablename__ = 'show_season_timeslot_credit'  # Actually a view
-    primary_key_field = 'show_season_timeslot_credit_id'
+#class TimeslotCredit(TimeslotAttachable, lass.credits.models.Credit):
+#    __tablename__ = 'show_season_timeslot_credit'  # Actually a view
+#    primary_key_field = 'show_season_timeslot_credit_id'
 
 
 #

@@ -108,9 +108,22 @@ class Attachable(
 
     @sqlalchemy.ext.declarative.declared_attr
     def subject(cls):
+        # We need to do some crazy magic to make sure we only allow in
+        # "valid" attachables.  This needs to be done after the database
+        # mapper initialisation, so it's done as a delayed function.
+        def mkjoin():
+            # If the subject has some concept of an "active time", filter
+            # the relationship so it only contains objects active at that
+            # time.
+            return (
+                (cls.subject_id == cls.subject_id_target) &
+                (cls.contains_object(cls.subject_target))
+            )
+
         return sqlalchemy.orm.relationship(
             cls.subject_target,
-            backref=cls.backref
+            backref=cls.backref,
+            primaryjoin=mkjoin
         )
 
 

@@ -88,9 +88,8 @@ def timeslot_detail(request):
         id_name='timeslotid',
         source=lass.model_base.DBSession.query(
             lass.schedule.models.Timeslot
-        ).options(
-            sqlalchemy.orm.joinedload('credits'),
         ),
+        # Don't load credits, as timeslots don't have any real credits.
         constraint=operator.attrgetter('season.show.type.is_public'),
         target_name='timeslot'
     )
