@@ -82,7 +82,7 @@ def podcast_detail(request):
 
 @pyramid.view.view_config(
     route_name='uryplayer-podcast-search',
-    renderer='uryplayer/podcast-search.jinja2'
+    renderer='uryplayer/podcast_search.jinja2'
 )
 def search(request):
     """Performs a search if a query is given, or allows the user to do
