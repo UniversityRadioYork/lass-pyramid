@@ -4,6 +4,7 @@ import operator
 import pyramid
 import sqlalchemy
 
+import lass.credits.query
 import lass.model_base
 import lass.schedule.models
 
@@ -14,20 +15,18 @@ import lass.schedule.models
 )
 def shows(request):
     """Displays a list of shows."""
-    return lass.common.view_helpers.media_list(
-        request,
-        lass.schedule.models.Show.public(
-        ).filter(
-            # Only show scheduled shows.
-            lass.schedule.models.Show.seasons.any(
-                lass.schedule.models.Season.timeslots.any()
-            )
-        ).options(
-            sqlalchemy.orm.subqueryload('credits')
-        ).order_by(
-            sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+    all_scheduled_shows = lass.schedule.models.Show.public().filter(
+        # Only show scheduled shows.
+        lass.schedule.models.Show.seasons.any(
+            lass.schedule.models.Season.timeslots.any()
         )
     )
+    with_credits = lass.credits.query.add_to_query(all_scheduled_shows)
+    source = with_credits.order_by(
+        sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+    )
+
+    return lass.common.view_helpers.media_list(request, source)
 
 
 @pyramid.view.view_config(
@@ -43,13 +42,9 @@ def show_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='showid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Show
-        ).options(
-            sqlalchemy.orm.joinedload('seasons', 'timeslots'),
-            sqlalchemy.orm.joinedload('credits')
-        ),
+        source=lass.schedule.models.Show,
         constraint=operator.attrgetter('type.is_public'),
+        query_options=(sqlalchemy.orm.joinedload('seasons', 'timeslots'),),
         target_name='show'
     )
 
@@ -67,12 +62,9 @@ def season_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='seasonid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Season
-        ).options(
-            sqlalchemy.orm.joinedload('timeslots'),
-        ),
+        source=lass.schedule.models.Season,
         constraint=operator.attrgetter('show.type.is_public'),
+        query_options=(sqlalchemy.orm.joinedload('timeslots'),),
         target_name='season'
     )
 
@@ -86,10 +78,7 @@ def timeslot_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='timeslotid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Timeslot
-        ),
-        # Don't load credits, as timeslots don't have any real credits.
+        source=lass.schedule.models.Timeslot,
         constraint=operator.attrgetter('season.show.type.is_public'),
         target_name='timeslot'
     )

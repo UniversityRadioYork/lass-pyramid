@@ -7,6 +7,7 @@ import sqlalchemy
 
 import lass.schedule.models
 
+import lass.credits.query
 import lass.common.time
 import lass.schedule.filler
 
@@ -164,39 +165,47 @@ def from_to(source, start, finish):
         A raw ordered list of every show from 'source' with air-time between
         'start' and 'finish'.
     """
-    return source.filter(
+    all_from_to = source.filter(
         (start < lass.schedule.models.Timeslot.finish) &
         (lass.schedule.models.Timeslot.start < finish)
-    ).options(
-        sqlalchemy.orm.subqueryload('season', 'show', 'credits')
-    ).order_by(
-        sqlalchemy.asc(lass.schedule.models.Timeslot.start)
-    ).all()
+    )
+    with_credits = load_credits(all_from_to)
+    return with_credits.order_by(order()).all()
 
 
 def next(source, start, finish, count):
-    """Selects the next 'count' shows, including the currently playing timeslot.
+    """Selects the next 'count' shows, current timeslot inclusive.
 
     No filling is done.
 
     Args:
-        source: A query providing the timeslots from which this function should
-            select.  For all public shows, use 'Timeslot.query.public()',
-            for example.
-        count: The maximum number of timeslots to select.
+        source: A query providing the timeslots from which this function
+            should select.  For all public shows, use
+            'Timeslot.public()', for example.
         start: The datetime used as a reference point to determine which
-            shows are the 'next' ones.  (Default: now)
+            shows are the 'next' ones.
         finish: Ignored; kept for interface consistency.
-
+        count: The maximum number of timeslots to select.
 
     Returns:
         A list of up to 'count' raw timeslots representing the next timeslots
         to occur from 'start' (or now if 'from' is None).
     """
-    return source.filter(
-        start < lass.schedule.models.Timeslot.finish
-    ).options(
-        sqlalchemy.orm.subqueryload('season', 'show', 'credits')
-    ).order_by(
-        sqlalchemy.asc(lass.schedule.models.Timeslot.start)
-    ).limit(count).all()
+    all_next = source.filter(start < lass.schedule.models.Timeslot.finish)
+    with_credits = load_credits(all_next)
+    return with_credits.order_by(order()).limit(count).all()
+
+
+def load_credits(query):
+    """Adds credit loading to a timeslot query."""
+    # Grab the *show*'s credits, because timeslots don't have their
+    # own.  What we do instead is make sure the show's credits are
+    # eager-loaded, and then any requests for the timeslot's credits
+    # are indirectly pulled from here.
+    path = ('season', 'show', 'credits')
+    return lass.credits.query.add_to_query(query, path)
+
+
+def order():
+    """Returns the correct ordering for timeslots in a schedule list."""
+    return sqlalchemy.asc(lass.schedule.models.Timeslot.start)

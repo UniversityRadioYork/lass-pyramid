@@ -88,7 +88,7 @@ def perform_search(request, source, format, detail_route):
             search.
         format: A string naming the format in which the results should
             be provided.  Currently this may be 'All Results', in which
-            case the results are returned as a media list, or 'First 
+            case the results are returned as a media list, or 'First
             Result', in which case the first result's detail page is
             redirected to via 'detail_route'.  The case of there being
             no results is handled identically for both.
@@ -96,7 +96,7 @@ def perform_search(request, source, format, detail_route):
             returning the URL of its details page.
 
     Returns:
-        A dict providing the contributions of the search results to the 
+        A dict providing the contributions of the search results to the
         view's template context; the returned dict should be merged
         into that returned by its calling view.
 
@@ -162,33 +162,43 @@ def media_list(request, source):
     }
 
 
-def detail(request, id_name, source, target_name='item', constraint=None):
+def truth(*_):
+    """Always returns True."""
+    return True
+
+
+def detail(request,
+    id_name,
+    source,
+    target_name='item',
+    constraint=truth,
+    query_options=()
+):
     """Implements a generic item detail view function.
 
-    NOTE: At the moment, 'source' must have a column named 'id' to be matched
-        against 'id_name'.  This should be replaced with an inspection
-        to find the primary key at some point.
+    If the item has credits, they will be automatically eagerly loaded.
+    Any other relationships will not be eagerly loaded unless explicitly
+    set as such in the relationship configuration or via
+    'query_options'.
 
     Args:
         request: The request that triggered the calling view.
-        id_name: The name of the matchdict key in which the primary key value of
-            the item to retrieve can be found.
-        source: The query that the ID should be retrieved from.  This allows
-            constraints (such as 'has_showdb_entry' for shows) to be placed on IDs
-            for which details can be found.
-        target_name: The name to give to the template variable containing the
-            item itself.  (Default: 'item'.)
+        id_name: The name of the matchdict key in which the primary key
+            value of the item to retrieve can be found.
+        source: The model for which the detail view is intended.
+        target_name: The name to give to the template variable
+            containing the item itself.  (Default: 'item'.)
         constraint: An optional function taking any matched item and returning
             True if it is allowed to have a detail page, and False otherwise.
             If not present, assume all items are allowed a detail page.
-            (Default: None.)
+            (Default: the function 'truth')
+        query_options: An optional set of query options to use when
+            creating the query, for example joinedload/eagerload
+            directives.   (Default: )
 
     Returns:
         A dict suitable for returning from a rendered detail view.
     """
-    if not constraint:
-        constraint = lambda _: True
-
     item_id_str = request.matchdict[id_name]
     try:
         item_id = int(item_id_str)
@@ -197,7 +207,11 @@ def detail(request, id_name, source, target_name='item', constraint=None):
             'Invalid ID: {}.'.format(item_id_str)
         )
 
-    item = source.get(item_id)
+    query = lass.model_base.DBSession.query(source)
+    with_credits = lass.credits.query.add_to_query(query)
+    with_options = with_credits.options(*query_options)
+
+    item = with_options.get(item_id)
     if not (item and constraint(item)):
         raise pyramid.exceptions.NotFound(
             'Could not get details for any item with ID {}.'.format(

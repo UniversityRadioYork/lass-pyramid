@@ -71,11 +71,7 @@ def podcast_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='podcastid',
-        source=lass.model_base.DBSession.query(
-            lass.uryplayer.models.Podcast
-        ).options(
-            sqlalchemy.orm.joinedload('credits')
-        ),
+        source=lass.uryplayer.models.Podcast,
         target_name='podcast'
     )
 
@@ -101,10 +97,12 @@ def search(request):
 
 def podcast_list_query():
     """Returns the query that should be used to make a podcast list."""
-    return lass.model_base.DBSession.query(
+    all_podcasts = lass.model_base.DBSession.query(
         lass.uryplayer.models.Podcast
-    ).options(
-        sqlalchemy.orm.subqueryload('credits')
-    ).order_by(
+    )
+
+    with_credits = lass.credits.query.add_to_query(all_podcasts)
+
+    return with_credits.order_by(
         sqlalchemy.desc(lass.uryplayer.models.Podcast.submitted_at)
     )
