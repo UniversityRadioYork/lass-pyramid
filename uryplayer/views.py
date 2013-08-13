@@ -62,6 +62,10 @@ def podcasts(request):
     route_name='uryplayer-podcast-detail',
     renderer='uryplayer/podcast_detail.jinja2'
 )
+@pyramid.view.view_config(
+    route_name='uryplayer-podcast-embed',
+    renderer='uryplayer/podcast_embed.jinja2'
+)
 def podcast_detail(request):
     """Displays detail about a podcast."""
     return lass.common.view_helpers.detail(
