@@ -125,9 +125,21 @@ class Show(
         order_by='Season.id'
     )
 
+    @property
+    def scheduled_seasons(self):
+        """Returns a list of this show's scheduled seasons.
+
+        A season is scheduled if and only if it contains at least one
+        timeslot.
+
+        Returns:
+            A list of scheduled seasons.
+        """
+        return [season for season in self.seasons if season.timeslots]
+
     @classmethod
     def public(cls):
-        """retrieves a query of all public shows."""
+        """Retrieves a query of all public shows."""
         return lass.model_base.DBSession.query(
             cls
         ).join(
