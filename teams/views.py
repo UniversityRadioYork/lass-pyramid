@@ -25,11 +25,10 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-
-import functools
-
-import pyramid
 import feedparser
+import functools
+import pickle
+import pyramid
 
 import lass.common.config
 
@@ -78,20 +77,40 @@ def blog(name):
     Args:
         name: The name of the blog as it appears in the blog configuration.
 
-    Returns:        
+    Returns:
         A dictionary ready to pass, straight or augmented, into a view renderer.
     """
     blog_config = lass.common.config.from_yaml('sitewide/blogs')[name]
-    
-    return { 
+
+    return {
         'blog': blog_config,
-        'get_posts': functools.partial(
-            get_blog_from_feed,
-            feed=blog_config['feed']
-        )
+        'get_posts': functools.partial(get_blog_posts, name, blog_config)
     }
 
 
-def get_blog_from_feed(feed, limit=None):
-    """Retrieves blog posts from an RSS or Atom feed."""
-    return feedparser.parse(feed)['entries'][:limit]
+def get_blog_posts(name, blog_config, limit=None):
+    """Retrieves blog posts for the given blog.
+
+    This will try to use local caches in assets:blogs first and, if
+    said caches do not exist, will get the RSS feed directly.
+
+    Args:
+        name: The name of the blog.
+        blog_config: The configuration for the blog, specifying where
+            the RSS feed may be found if it isn't cached.
+        limit: A limit on the number of items retrieved from the feed.
+            (Default: None, or no limit.)
+
+    Returns:
+        A feedparser-compatible blog feed object.
+    """
+    asset = 'assets:blogs/{}'.format(name)
+    full_path = pyramid.path.AssetResolver().resolve(asset).abspath()
+
+    try:
+        with open(full_path, 'rb') as feed_file:
+            feed = pickle.load(feed_file)
+    except IOError:
+        feed = feedparser.feed(blog_config['feed'])
+
+    return feed['entries'][:limit]
