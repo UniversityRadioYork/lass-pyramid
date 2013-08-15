@@ -67,6 +67,20 @@ def signup(request):
     }
     r = requests.post(config['create-user-url'], data=payload)
     r.raise_for_status()
+    
+    # Get the created ID
+    j = r.json()
+    id = j['memberid']
+    
+    for i in request.params.getall('interest'):
+      payload = {
+        config['param-api-key']: config['api-key'],
+        config['param-subscribe-memberid']: id
+      }
+      r = requests.post(config['subscribe-url-base'] + i 
+              + config['subscribe-url-suffix'], data=payload)
+      r.raise_for_status()
+    
     return {}
 
 @pyramid.view.view_config(
