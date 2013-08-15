@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import functools
 import pyramid
-import request
+import requests
 
 import lass.common.config
 import lass.website.models
