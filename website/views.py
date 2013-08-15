@@ -65,7 +65,7 @@ def signup(request):
         config['param-gender']: request.params.get('gender'),
         config['param-college']: request.params.get('college')
     }
-    r = requests.post(config.create-user-url, data=payload)
+    r = requests.post(config['create-user-url'], data=payload)
     r.raise_for_status()
     return {}
 
