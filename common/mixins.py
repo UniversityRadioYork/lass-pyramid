@@ -90,17 +90,12 @@ class Transient(object):
         """Checks whether this transient was active at any point
         between 'start' and 'finish'.
         """
-        null = None  # Stop static analysis from complaining about == None
-        return (
-            self.started_by(finish) & self.not_finished_by(start)
-       )
+        return (self.started_by(finish) & self.not_finished_by(start))
 
     @sqlalchemy.ext.hybrid.hybrid_method
     def contains(self, date):
         """Checks whether 'date' is inside the range of this transient."""
-        return (
-            self.started_by(date) & self.not_finished_by(date)
-        )
+        return (self.started_by(date) & self.not_finished_by(date))
 
     @sqlalchemy.ext.hybrid.hybrid_method
     def started_by(self, date):
@@ -123,23 +118,19 @@ class Transient(object):
         or after the given date.
         """
         # Must be separate because | doesn't short-circuit.
-        return (self.effective_to is None) or date <= self.effective_to
+        return (self.effective_to is None) or date < self.effective_to
 
     @not_finished_by.expression
     def not_finished_by(cls, date):
         """The SQL expression version of 'not_finished_by'."""
         null = None  # Stop static analysis from complaining about == None
-        return (cls.effective_to == null) | (date <= cls.effective_to)
-
-
+        return (cls.effective_to == null) | (date < cls.effective_to)
 
     @sqlalchemy.ext.hybrid.hybrid_method
     def contains_submitted_at(self, _):
         """Checks whether this transient is active for an object whose
         submission date is 'submitted_at'.
         """
-        null = None  # Stop static analysis from complaining about == None
-
         # Ignore the submission date, because at the moment an active
         # transient on a submission date is one that is currently
         # active with respect to now.
@@ -160,7 +151,6 @@ class Transient(object):
         else:
             cmp = True
         return cmp
-
 
     @classmethod
     def active_on(cls, date, transient=None):
