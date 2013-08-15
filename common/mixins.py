@@ -107,7 +107,9 @@ class Transient(object):
         """Is true when a transient has become effective on or before
         the given date.
         """
-        return (self.effective_from is not None) or self.effective_from <= date
+        return (
+            (self.effective_from is not None) and self.effective_from <= date
+        )
 
     @started_by.expression
     def started_by(cls, date):

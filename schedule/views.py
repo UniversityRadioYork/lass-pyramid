@@ -1,11 +1,46 @@
+"""Views for the Schedule submodule.
+
+---
+
+Copyright (c) 2013, University Radio York.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright notice,
+  this list of conditions and the following disclaimer.
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+"""
 import datetime
 import functools
 import operator
 import pyramid
 import sqlalchemy
 
+import lass.credits.query
 import lass.model_base
 import lass.schedule.models
+
+
+#
+# SHOW DATABASE
+#
 
 
 @pyramid.view.view_config(
@@ -14,19 +49,32 @@ import lass.schedule.models
 )
 def shows(request):
     """Displays a list of shows."""
-    return lass.common.view_helpers.media_list(
-        request,
-        lass.schedule.models.Show.public(
-        ).filter(
-            # Only show scheduled shows.
-            lass.schedule.models.Show.seasons.any(
-                lass.schedule.models.Season.timeslots.any()
-            )
-        ).options(
-            sqlalchemy.orm.subqueryload('credits')
-        ).order_by(
-            sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+    all_scheduled_shows = lass.schedule.models.Show.public().filter(
+        # Only show scheduled shows.
+        lass.schedule.models.Show.seasons.any(
+            lass.schedule.models.Season.timeslots.any()
         )
+    )
+    with_credits = lass.credits.query.add_to_query(all_scheduled_shows)
+    source = with_credits.order_by(
+        sqlalchemy.desc(lass.schedule.models.Show.submitted_at)
+    )
+
+    return lass.common.view_helpers.media_list(request, source)
+
+
+@pyramid.view.view_config(
+    route_name='schedule-show-search',
+    renderer='schedule/show_search.jinja2'
+)
+def search(request):
+    """Performs a search if a query is given, or allows the user to do
+    so.
+    """
+    return lass.common.view_helpers.search(
+        request,
+        lass.schedule.models.Show,
+        lambda id: request.route_url('schedule-show-detail', showid=id)
     )
 
 
@@ -43,13 +91,9 @@ def show_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='showid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Show
-        ).options(
-            sqlalchemy.orm.joinedload('seasons', 'timeslots'),
-            sqlalchemy.orm.joinedload('credits')
-        ),
+        source=lass.schedule.models.Show,
         constraint=operator.attrgetter('type.is_public'),
+        query_options=(sqlalchemy.orm.joinedload('seasons', 'timeslots'),),
         target_name='show'
     )
 
@@ -67,12 +111,9 @@ def season_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='seasonid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Season
-        ).options(
-            sqlalchemy.orm.joinedload('timeslots'),
-        ),
+        source=lass.schedule.models.Season,
         constraint=operator.attrgetter('show.type.is_public'),
+        query_options=(sqlalchemy.orm.joinedload('timeslots'),),
         target_name='season'
     )
 
@@ -86,10 +127,7 @@ def timeslot_detail(request):
     return lass.common.view_helpers.detail(
         request,
         id_name='timeslotid',
-        source=lass.model_base.DBSession.query(
-            lass.schedule.models.Timeslot
-        ),
-        # Don't load credits, as timeslots don't have any real credits.
+        source=lass.schedule.models.Timeslot,
         constraint=operator.attrgetter('season.show.type.is_public'),
         target_name='timeslot'
     )

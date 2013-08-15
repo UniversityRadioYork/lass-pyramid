@@ -33,6 +33,7 @@ import functools
 import itertools
 import sqlalchemy
 
+import lass.credits.query
 import lass.common.time
 import lass.metadata.models
 
@@ -120,7 +121,7 @@ def all_metadata(meta_model, priority):
         lass.metadata.models.Key
     )
 
-    
+
 def run(subjects, meta_type, date, sources, *keys):
     # Metadata is currently held in a relational database.
     # It would be spiffing to change this
@@ -220,7 +221,7 @@ def search(term, keys, model, now=None, order='alpha'):
     """
     if now is None:
         now = lass.common.time.aware_now()
- 
+
     # This is needed to force the backreferences on model that point to its
     # metadata to appear.  Any less hacky way of doing this is much appreciated.
     _ = model()
@@ -228,11 +229,15 @@ def search(term, keys, model, now=None, order='alpha'):
     meta = relationship_to_model(model.text_entries)
 
     if term and keys:
-        query = lass.model_base.DBSession.query(
+        all = lass.model_base.DBSession.query(
             model
         ).join(
             model.text_entries
-        ).filter(
+        )
+
+        with_credits = lass.credits.query.add_to_query(all)
+
+        query = with_credits.filter(
             (meta.contains(now)) &
             (meta.value.ilike("%{}%".format(term))) &
             meta.key.has(lass.metadata.models.Key.name.in_(keys))

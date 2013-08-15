@@ -28,12 +28,14 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
+import datetime
 import functools
 import operator
 import unittest.mock
 
 import lass.common.time
 import lass.schedule.blocks
+import lass.schedule.models
 
 
 TEST_BLOCK_CONFIG = {
@@ -179,3 +181,41 @@ def test_range_iter():
         assert iter_name == name
         assert iter_datetime.hour == hour
         assert iter_datetime.minute == minute
+
+
+#
+# lass.schedule.models
+#
+
+
+def test_show_schedule_seasons():
+    """Tests 'lass.schedule.models.Show.scheduled_seasons'."""
+    show = lass.schedule.models.Show(submitted_at=lass.common.time.aware_now())
+
+    # If no seasons, there should be no scheduled seasons.
+
+    show.seasons = []
+    assert show.scheduled_seasons == []
+
+    # scheduled_seasons should contain only seasons whose timeslots
+    # attribute is not empty.
+
+    timeslot = lass.schedule.models.Timeslot(
+        start=lass.common.time.aware_now(),
+        duration=datetime.timedelta(hours=1)
+    )
+
+    bad_season = lass.schedule.models.Season(show=show)
+    bad_season.timeslots = []
+
+    good_season = lass.schedule.models.Season(show=show)
+    good_season.timeslots = [timeslot]
+
+    show.seasons = [bad_season]
+    assert show.scheduled_seasons == []
+
+    show.seasons = [good_season]
+    assert show.scheduled_seasons == [good_season]
+
+    show.seasons = [bad_season, good_season]
+    assert show.scheduled_seasons == [good_season]
