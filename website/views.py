@@ -56,7 +56,7 @@ def static(_):
 )
 def signup(request):
     """The view for processing a sign up"""
-    config = lass.common.config.from_yaml('sitewide/website').api
+    config = lass.common.config.from_yaml('sitewide/website')['api']
     payload = {
         config.param-api-key: config['api-key'],
         config['param-first-name']: request.params.get('first-name'),
