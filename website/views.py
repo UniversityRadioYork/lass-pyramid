@@ -42,6 +42,10 @@ import lass.website.models
     renderer='website/getinvolved.jinja2'
 )
 @pyramid.view.view_config(
+    route_name='signup',
+    renderer='website/signup.jinja2'
+)
+@pyramid.view.view_config(
     route_name='listen',
     renderer='website/listen.jinja2'
 )
