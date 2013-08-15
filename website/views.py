@@ -66,8 +66,8 @@ def signup(request):
         config['param-college']: request.params.get('college')
     }
     r = requests.post(config['create-user-url'], data=payload)
-    r.raise_for_status()
-    return {}
+    #r.raise_for_status()
+    return payload
 
 @pyramid.view.view_config(
     route_name='contact',
