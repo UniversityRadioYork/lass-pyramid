@@ -28,6 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import functools
 import pyramid
+import request
 
 import lass.common.config
 import lass.website.models
@@ -42,10 +43,6 @@ import lass.website.models
     renderer='website/getinvolved.jinja2'
 )
 @pyramid.view.view_config(
-    route_name='signup',
-    renderer='website/signup.jinja2'
-)
-@pyramid.view.view_config(
     route_name='listen',
     renderer='website/listen.jinja2'
 )
@@ -53,6 +50,24 @@ def static(_):
     """A view that can be used for static website pages."""
     return {}
 
+@pyramid.view.view_config(
+    route_name='signup',
+    renderer='website/signup.jinja2'
+)
+def signup(request):
+    """The view for processing a sign up"""
+    config = lass.common.config.from_yaml('sitewide/website').api
+    payload = {
+        config.param-api-key: config['api-key'],
+        config['param-first-name']: request.params.get('first-name'),
+        config['param-last-name']: request.params.get('last-name'),
+        config['param-email']: request.params.get('email'),
+        config['param-gender']: request.params.get('gender'),
+        config['param-college']: request.params.get('college')
+    }
+    r = requests.post(config.create-user-url, data=payload)
+    r.raise_for_status()
+    return {}
 
 @pyramid.view.view_config(
     route_name='contact',
