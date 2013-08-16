@@ -1,37 +1,51 @@
 import os
 import sys
-#import transaction
+import pyramid.paster
+import sqlalchemy
 
-from sqlalchemy import engine_from_config
-
-from pyramid.paster import (
-    get_appsettings,
-    setup_logging,
-)
-
-from ..model_base import (
-    DBSession,
-    Base,
-)
-#    MyModel,
+import lass.model_base
 
 
-def usage(argv):
-    cmd = os.path.basename(argv[0])
-    print('usage: %s <config_uri>\n'
-          '(example: "%s development.ini")' % (cmd, cmd))
+def usage(full_cmd):
+    cmd = os.path.basename(full_cmd)
+    print(
+        'usage: {0} <config_uri>\n'
+        '(example: "{0} development.ini")'.format(cmd)
+    )
     sys.exit(1)
 
 
 def main(argv=sys.argv):
-    if len(argv) != 2:
-        usage(argv)
-    config_uri = argv[1]
-    setup_logging(config_uri)
-    settings = get_appsettings(config_uri)
-    engine = engine_from_config(settings, 'sqlalchemy.')
-    DBSession.configure(bind=engine)
-    Base.metadata.create_all(engine)
-#    with transaction.manager:
-#        model = MyModel(name='one', value=1)
-#        DBSession.add(model)
+    full_cmd, *rest = argv
+    try:
+        (config_uri, ) = rest
+    except ValueError:
+        usage(full_cmd)
+
+    # Don't forget to add any new model modules here
+    import lass.credits.models
+    import lass.metadata.models
+    import lass.music.models
+    import lass.people.models
+    import lass.schedule.models
+    import lass.uryplayer.models
+
+    pyramid.paster.setup_logging(config_uri)
+    settings = pyramid.paster.get_appsettings(config_uri)
+    engine = sqlalchemy.engine_from_config(settings, 'sqlalchemy.')
+    lass.model_base.DBSession.configure(bind=engine)
+
+    # Don't forget to add any new schemata here
+    schemata = set()
+    for table in lass.model_base.Base.metadata.sorted_tables:
+        if table.schema:
+            schemata.add(table.schema)
+
+    for schema in schemata:
+        try:
+            engine.execute(sqlalchemy.schema.CreateSchema(schema))
+        except sqlalchemy.exc.ProgrammingError:
+            # Assume this means the schema already exists
+            pass
+
+    lass.model_base.Base.metadata.create_all(engine)

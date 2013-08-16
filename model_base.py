@@ -12,3 +12,9 @@ DBSession = sqlalchemy.orm.scoped_session(
 
 
 Base = sqlalchemy.ext.declarative.declarative_base()
+
+
+class PublicModel(Base):
+    """Base class for models in the public schema."""
+    __abstract__ = True
+    __table_args__ = {'schema': 'public'}
