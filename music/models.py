@@ -65,14 +65,14 @@ def lookup_descr(name, direct_name=False):
 # REC
 #
 
-class Genre(lass.model_base.Base):
+class Genre(lass.model_base.PublicModel):
     """A genre in the track database."""
     __tablename__ = 'rec_genrelookup'
     id = lookup_id('genre')
     description = lookup_descr('genre')
 
 
-class Medium(lass.model_base.Base):
+class Medium(lass.model_base.PublicModel):
     """A type of record medium in the track database.
 
     Medium in this case means, for example, 'vinyl', 'CD' etc.
@@ -82,7 +82,7 @@ class Medium(lass.model_base.Base):
     description = lookup_descr('media')
 
 
-class RecordFormat(lass.model_base.Base):
+class RecordFormat(lass.model_base.PublicModel):
     """A type of record format in the track database.
 
     Format in this case means, for example, 'album' or 'single'.
@@ -92,21 +92,21 @@ class RecordFormat(lass.model_base.Base):
     description = lookup_descr('format')
 
 
-class RecordStatus(lass.model_base.Base):
+class RecordStatus(lass.model_base.PublicModel):
     """A type of cleanliness status in the track database."""
     __tablename__ = 'rec_statuslookup'
     id = lookup_id('status')
     description = lookup_descr('status')
 
 
-class CleanStatus(lass.model_base.Base):
+class CleanStatus(lass.model_base.PublicModel):
     """A type of cleanliness status in the track database."""
     __tablename__ = 'rec_cleanlookup'
     id = lookup_id('clean')
     description = lookup_descr('clean')
 
 
-class Record(lass.model_base.Base):
+class Record(lass.model_base.PublicModel):
     """A record in the track database."""
     __tablename__ = 'rec_record'
 
@@ -172,7 +172,7 @@ class Record(lass.model_base.Base):
     promoterid = sqlalchemy.Column(sqlalchemy.Integer)
 
 
-class Track(lass.model_base.Base):
+class Track(lass.model_base.PublicModel):
     """A track in the track database."""
     __tablename__ = 'rec_track'
 
