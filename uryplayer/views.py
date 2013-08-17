@@ -100,8 +100,12 @@ def podcast_list_query():
     all_podcasts = lass.model_base.DBSession.query(
         lass.uryplayer.models.Podcast
     )
+    
+    published_podcasts = all_podcasts.filter(
+        lass.uryplayer.models.Podcast.submitted_at != None
+    )
 
-    with_credits = lass.credits.query.add_to_query(all_podcasts)
+    with_credits = lass.credits.query.add_to_query(published_podcasts)
 
     return with_credits.order_by(
         sqlalchemy.desc(lass.uryplayer.models.Podcast.submitted_at)
