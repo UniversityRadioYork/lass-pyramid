@@ -51,6 +51,24 @@ def static(_):
     return {}
 
 
+class SignupError(Exception):
+    """Exception marking an error found during signup."""
+    def __init__(self, stage, details):
+        """Creates a SignupError.
+
+        Args:
+            stage: A string defining the stage of signup at which the
+                error occurred.
+            details: An object (expected type dependent on stage)
+                providing more details about the error.
+
+        Returns:
+            A SignupError.
+        """
+        self.stage = stage
+        self.details = details
+
+
 @pyramid.view.view_config(
     route_name='signup',
     renderer='website/signup.jinja2'
@@ -58,33 +76,172 @@ def static(_):
 def signup(request):
     """The view for processing a sign up"""
     config = lass.common.config.from_yaml('sitewide/website')['api']
+
+    try:
+        create_payload = signup_validate_create(config, request.params)
+        member_id = signup_create_user(config, create_payload)
+
+        subscribe_payload, interest_urls = (
+            signup_validate_subscribe(config, request.params, member_id)
+        )
+        context = (
+            signup_subscribe_user(subscribe_payload, interest_urls)
+        )
+    except SignupError as error:
+        context = {'error': error.stage, 'details': error.details}
+
+    return context
+
+
+def signup_validate_create(config, params):
+    """Validates the incoming signup and returns a payload for it.
+
+    Args:
+        config: The API configuration.
+        params: The raw HTTP request parameter multidict containing the
+            signup form information.
+
+    Returns:
+        A dictionary that can be used as the payload for a user creation
+        API request.
+
+    Raises:
+        SignupError if the arguments fail validation.
+    """
+    payload = {config['param-api-key']: config['api-key']}
+    errors = []
+
+    trimmed_params = {key: value.strip() for key, value in params.items()}
+
+    for key, name in (
+        ('first-name', 'a first name'),
+        ('last-name', 'a last name'),
+        ('email', 'an email address'),
+        ('gender', 'a gender'),
+        ('college', 'a college')
+    ):
+        if not trimmed_params.get(key, ''):
+            errors.append('You have not provided {}.'.format(name))
+        else:
+            payload[config['param-' + key]] = trimmed_params[key]
+
+    if not errors:
+        try:
+            int(trimmed_params['college'])
+        except ValueError:
+            errors.append(
+                (
+                    "The college code we've received doesn't look right.  "
+                    'This is probably a problem on our end.'
+                ).format(key)
+            )
+        if trimmed_params['gender'] not in 'omf':
+            errors.append(
+                (
+                    "The gender code we've received doesn't look right.  "
+                    'This is probably a problem on our end.'
+                ).format(key)
+            )
+
+    if errors:
+        raise SignupError('validate', errors)
+
+    return payload
+
+
+def signup_create_user(config, payload):
+    """Performs the user creation part of the signup process."""
+    json = signup_request('create', config['create-user-url'], payload)
+    return json['memberid']
+
+
+def signup_validate_subscribe(config, params, member_id):
+    """Validates the incoming subscription and returns a payload for it.
+
+    Args:
+        config: The API configuration.
+        params: The raw HTTP request parameter multidict containing the
+            signup form information.
+        member_id: The ID of the subscribing member.
+
+    Returns:
+        A tuple containing a dictionary that can be used as the payload
+        for a user creation API request, and secondly an iterable of
+        URLs representing the targets of each requested subscription.
+
+    Raises:
+        SignupError if the arguments fail validation.
+    """
+    errors = []
     payload = {
         config['param-api-key']: config['api-key'],
-        config['param-first-name']: request.params.get('first-name'),
-        config['param-last-name']: request.params.get('last-name'),
-        config['param-email']: request.params.get('email'),
-        config['param-gender']: request.params.get('gender'),
-        config['param-college']: request.params.get('college')
+        config['param-subscribe-memberid']: member_id
     }
-    r = requests.post(config['create-user-url'], data=payload)
-    r.raise_for_status()
 
-    # Get the created ID
-    j = r.json()
-    id = j['memberid']
-
-    for i in request.params.getall('interest'):
-        payload = {
-            config['param-api-key']: config['api-key'],
-            config['param-subscribe-memberid']: id
-        }
-        r = requests.post(
-            config['subscribe-url-base'] + i + config['subscribe-url-suffix'],
-            data=payload
+    try:
+        member_id_int = int(member_id)
+    except ValueError:
+        errors.append(
+            'The member ID we received is not in the correct format.  '
+            'This is almost certainly a bug in our website.'
         )
-        r.raise_for_status()
+        member_id_int = None
+    else:
+        if member_id_int < 0:
+            errors.append(
+                'We were given a negative member ID when signing you up.  '
+                'This is almost certainly a bug in our website.'
+            )
+
+    interests = []
+    if 'interest' in params:
+        for interest_id in params.getall('interest'):
+            try:
+                interest_id_int = int(interest_id)
+            except ValueError:
+                errors.append(
+                    'The data we received about your interests appears '
+                    'not to have reached us properly.  This is almost'
+                    'certainly a bug in our signup form.'
+                )
+            else:
+                if interest_id_int < 0:
+                    errors.append(
+                        'We were given a negative interest code from the '
+                        'signup form.  This is almost certainly a bug in our '
+                        'signup form.'
+                    )
+                else:
+                    interests.append(interest_id)
+
+    base = config['subscribe-url-base']
+    suffix = config['subscribe-url-suffix']
+    interest_urls = (
+        ''.join((base, interest, suffix)) for interest in interests
+    )
+
+    if errors:
+        raise SignupError('validate', errors)
+
+    return payload, interest_urls
+
+
+def signup_subscribe_user(payload, interest_urls):
+    """Performs the subscription part of the signup process."""
+    for interest_url in interest_urls:
+        signup_request('subscribe', interest_url, payload)
 
     return {}
+
+
+def signup_request(stage, url, payload):
+    """Sends a request to the signup API."""
+    response = requests.post(url, data=payload)
+    try:
+        response.raise_for_status()
+    except requests.exceptions.HTTPError:
+        raise SignupError(stage, response.json()['message'])
+    return response.json()
 
 
 @pyramid.view.view_config(
