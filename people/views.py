@@ -40,7 +40,13 @@ import lass.common.view_helpers
 def person_detail(request):
     """Provides details about a person."""
     person_id = request.matchdict['id']
-    person = lass.common.api.get('User/{}'.format(person_id))
+
+    try:
+        person = lass.common.api.get('User/{}'.format(person_id))
+    except lass.common.api.NotFound:
+        raise pyramid.httpexceptions.HTTPNotFound(
+            'No member with this ID exists.'
+        )
 
     if not person or not (person['officerships'] or person['shows']):
         raise pyramid.httpexceptions.HTTPNotFound(

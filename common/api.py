@@ -32,9 +32,16 @@ import requests
 import lass.common.config
 
 
-class APIError(Exception):
+class Error(Exception):
     """Error representing a failure to establish meaningful contact with
     the URY API.
+    """
+    pass
+
+
+class NotFound(Exception):
+    """Error thrown when the API is asked to retrieve a resource that
+    does not exist.
     """
     pass
 
@@ -61,8 +68,7 @@ def get(resource, config=None, **params):
     url = resource_to_url(resource, config)
 
     response = requests.get(url, params=payload)
-    raise_api_error_if_failure(response)
-
+    raise_api_error_if_failure(response, resource, url)
 
     return response.json()
 
@@ -96,13 +102,18 @@ def params_to_payload(params, config):
     return dict(base_payload, **params)
 
 
-def raise_api_error_if_failure(response):
+def raise_api_error_if_failure(response, resource, url):
     """Raises an API error if the response denotes a failure to talk
     to the API meaningfully."""
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as exc:
-        raise APIError(
+        cls = (
+            NotFound
+            if response.status_code == requests.codes.not_found
+            else Error
+        )
+        raise cls(
             'Could not GET resource {} via {}.'.format(
                 resource,
                 url
