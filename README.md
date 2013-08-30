@@ -37,5 +37,6 @@ What's missing
 * API server; see UniversityRadioYork/MyRadio.
 
 In addition, since we tend to update all of the website "in step" in a private workflow, updates to this repository from URY may be slow to materialise.
+Most new code from URY's website development efforts will appear in the "from_ury" branch before going into master.
 
 For information on producing these, lodge an issue or contact CaptainHayashi.
